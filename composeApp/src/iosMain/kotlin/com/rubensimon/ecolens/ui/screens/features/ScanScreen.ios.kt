@@ -324,10 +324,11 @@ suspend fun uploadImageToPredict(imageData: NSData): Triple<String, Int, String>
                     
                     val points = ptsStr.toIntOrNull() ?: 10
                     
-                    println("[iOS Predict] Resultado: $displayLabel, Puntos: $points")
+                    // Log de depuración para desarrollo interno
+                    // println("[iOS Predict] Resultado: $displayLabel, Puntos: $points")
                     cont.resume(Triple(displayLabel, points, msg))
                 } catch (e: Exception) {
-                    println("Decode Error: ${e.message} in $jsonStr")
+                    // println("Decode Error: ${e.message} in $jsonStr")
                     cont.resume(Triple("Objeto", 10, "Error al procesar la respuesta de la IA"))
                 }
             } else {

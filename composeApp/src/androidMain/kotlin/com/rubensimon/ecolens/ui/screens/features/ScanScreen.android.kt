@@ -211,7 +211,8 @@ private fun captureAndPredictLocal(
                             val bestLabel = reliableLabels.first()
                             highestConfidence = bestLabel.confidence
                             
-                            println("[MLKit] Etiquetas confiables: $allLabelTexts (Top: ${bestLabel.text} @ $highestConfidence)")
+                            // Log de depuración para desarrollo (opcional)
+                            // println("[MLKit] Etiquetas confiables: $allLabelTexts (Top: ${bestLabel.text} @ $highestConfidence)")
 
                             when {
                                 allLabelTexts.contains("bottle") || allLabelTexts.contains("plastic") || allLabelTexts.contains("pet") -> {

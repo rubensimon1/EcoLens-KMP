@@ -17,7 +17,9 @@ import kotlinx.datetime.Clock
  * y se ejecutan en coroutines. No depende de Android APIs.
  *
  * ## Cambios respecto al original Android
- * - `Log.d/e` → `println()` (compatible KMP)
+/**
+ * Repositorio de usuarios para la gestión de datos en Supabase.
+ */
  * - `SimpleDateFormat` → `kotlinx-datetime`
  * - `SupabaseClient.client` → `SupabaseClientProvider.client`
  * - `gotrue` → `auth` (supabase-kt v3 renaming)

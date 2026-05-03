@@ -1,54 +1,66 @@
-This is a Kotlin Multiplatform project targeting Android, iOS.
+# EcoLens 🌍♻️
 
-* [/composeApp](./composeApp/src) is for code that will be shared across your Compose Multiplatform applications.
-  It contains several subfolders:
-  - [commonMain](./composeApp/src/commonMain/kotlin) is for code that’s common for all targets.
-  - Other folders are for Kotlin code that will be compiled for only the platform indicated in the folder name.
-    For example, if you want to use Apple’s CoreCrypto for the iOS part of your Kotlin app,
-    the [iosMain](./composeApp/src/iosMain/kotlin) folder would be the right place for such calls.
-    Similarly, if you want to edit the Desktop (JVM) specific part, the [jvmMain](./composeApp/src/jvmMain/kotlin)
-    folder is the appropriate location.
+**EcoLens** es una aplicación móvil multiplataforma diseñada para revolucionar la forma en que interactuamos con el reciclaje. Utilizando Inteligencia Artificial y tecnologías de vanguardia, EcoLens permite a los usuarios identificar materiales reciclables, seguir su impacto ambiental y ganar recompensas por sus acciones ecológicas.
 
-* [/iosApp](./iosApp/iosApp) contains iOS applications. Even if you’re sharing your UI with Compose Multiplatform,
-  you need this entry point for your iOS app. This is also where you should add SwiftUI code for your project.
+Desarrollada con **Kotlin Multiplatform (KMP)**, la aplicación comparte más del 85% del código entre Android e iOS, ofreciendo una experiencia nativa y fluida en ambas plataformas.
 
-### Build and Run Android Application
+## ✨ Características Principales
 
-To build and run the development version of the Android app, use the run configuration from the run widget
-in your IDE’s toolbar or build it directly from the terminal:
-- on macOS/Linux
-  ```shell
-  ./gradlew :composeApp:assembleDebug
-  ```
-- on Windows
-  ```shell
-  .\gradlew.bat :composeApp:assembleDebug
-  ```
+- **📸 Escaneo con IA**: Reconocimiento de objetos en tiempo real (Botellas, Latas, Papel, Vidrio) utilizando Google ML Kit (Android) y modelos remotos/CoreML (iOS).
+- **🗺️ Mapa de Reciclaje**: Localización inteligente de puntos de reciclaje cercanos con filtros por tipo de residuo.
+- **🏆 Sistema de Gamificación**: Ranking global, misiones diarias y logros desbloqueables.
+- **🎁 Recompensas**: Canjeo de puntos por cupones y beneficios ecológicos reales.
+- **📊 Eco-Dex**: Colección visual de todos los objetos que has reciclado, fomentando la conciencia ambiental.
 
-### Build and Run iOS Application
+## 🛠️ Stack Tecnológico
 
-To build and run the development version of the iOS app, use the run configuration from the run widget
-in your IDE’s toolbar or open the [/iosApp](./iosApp) directory in Xcode and run it from there.
+- **Core**: Kotlin Multiplatform (KMP)
+- **UI**: Compose Multiplatform (Material 3)
+- **Backend**: Supabase (Postgrest, Auth, Storage, Realtime)
+- **Networking**: Ktor Client (Content Negotiation, Serialization)
+- **IA/ML**: Google ML Kit (Android) & Apple Vision/CoreML (iOS)
+- **Inyección de Dependencias/Config**: Gradle con tareas automatizadas de secretos.
+- **Persistencia**: Multiplatform Settings (Configuraciones de usuario).
+
+## 🏗️ Estructura del Proyecto
+
+```text
+.
+├── composeApp/            # Código compartido (Common), Android e iOS Main
+│   ├── src/commonMain/    # Lógica de negocio, UI compartida y Repositorios
+│   ├── src/androidMain/   # Implementaciones nativas de Android (Cámara, Mapas)
+│   └── src/iosMain/       # Implementaciones nativas de iOS (Frameworks Apple)
+├── iosApp/                # Proyecto nativo Xcode (entry point para iOS)
+├── gradle/                # Configuración de dependencias (Version Catalogs)
+└── local.properties       # Configuración de secretos (Privado)
+```
+
+## 🚀 Configuración e Instalación
+
+Para ejecutar este proyecto localmente, sigue estos pasos:
+
+1.  **Clona el repositorio**:
+    ```bash
+    git clone https://github.com/rubensimon1/EcoLens-KMP.git
+    ```
+
+2.  **Configura los secretos**:
+    Crea un archivo `local.properties` en la raíz del proyecto basado en el ejemplo proporcionado:
+    ```properties
+    SUPABASE_URL=tu_url_de_supabase
+    SUPABASE_KEY=tu_anon_key_de_supabase
+    MAPS_API_KEY=tu_google_maps_api_key
+    ML_BACKEND_URL=tu_url_del_servidor_ia
+    ```
+
+3.  **Compila y ejecuta**:
+    - **Android**: Abre en Android Studio y ejecuta el módulo `composeApp`.
+    - **iOS**: Abre el archivo `iosApp/iosApp.xcodeproj` en Xcode o ejecuta directamente desde Android Studio si tienes configurado el plugin de KMP.
+
+## 📱 Capturas de Pantalla
+
+*(Próximamente: Añade aquí tus capturas para un impacto visual total)*
 
 ---
 
-Learn more about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html)…
-
-### Local Configuration
-
-- All credentials are read from `local.properties` and injected at build time.
-- Never commit real values. Use `local.properties.example` as template.
-- Required keys:
-  - `MAPS_API_KEY`
-  - `SUPABASE_URL`
-  - `SUPABASE_KEY`
-  - `ML_BACKEND_URL`
-
-- Example in `local.properties`:
-
-```properties
-MAPS_API_KEY=your_google_maps_key
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_KEY=your_supabase_anon_key
-ML_BACKEND_URL=https://your-backend.example.com/
-```
+**Desarrollado por Rubens Simon** - *Proyecto de Fin de Grado (TFG)*
