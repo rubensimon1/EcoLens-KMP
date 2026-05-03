@@ -99,11 +99,34 @@ actual fun PlatformMapView(
         }
     }
 
+    val mapView = remember { MapView(context) }
+    
+    // ── Gestión del Ciclo de Vida del Mapa ──
+    val lifecycleObserver = remember(mapView) {
+        androidx.lifecycle.LifecycleEventObserver { _, event ->
+            when (event) {
+                androidx.lifecycle.Lifecycle.Event.ON_CREATE -> mapView.onCreate(android.os.Bundle())
+                androidx.lifecycle.Lifecycle.Event.ON_START -> mapView.onStart()
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> mapView.onResume()
+                androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> mapView.onPause()
+                androidx.lifecycle.Lifecycle.Event.ON_STOP -> mapView.onStop()
+                androidx.lifecycle.Lifecycle.Event.ON_DESTROY -> mapView.onDestroy()
+                else -> {}
+            }
+        }
+    }
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle) {
+        lifecycle.addObserver(lifecycleObserver)
+        onDispose {
+            lifecycle.removeObserver(lifecycleObserver)
+        }
+    }
+
     AndroidView(
         modifier = modifier,
-        factory = { ctx ->
-            MapView(ctx).apply {
-                onCreate(null)
+        factory = { 
+            mapView.apply {
                 getMapAsync { googleMap ->
                     mapInstance = googleMap
                     googleMap.uiSettings.apply {
@@ -114,12 +137,11 @@ actual fun PlatformMapView(
                     }
                     googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(40.4168, -3.7038), 10f))
                 }
-                onResume()
             }
         },
-        update = { mapView ->
+        update = { mv ->
             val pointsSnapshot = recyclingPoints
-            mapView.getMapAsync { googleMap ->
+            mv.getMapAsync { googleMap ->
                 if (pointsSnapshot.isNotEmpty()) {
                     googleMap.clear()
                     pointsSnapshot.forEach { point ->
@@ -130,14 +152,18 @@ actual fun PlatformMapView(
                             "MOVIL_24H" -> com.google.android.gms.maps.model.BitmapDescriptorFactory.HUE_VIOLET
                             else -> com.google.android.gms.maps.model.BitmapDescriptorFactory.HUE_GREEN
                         }
-                        val marker = googleMap.addMarker(
-                            MarkerOptions()
-                                .position(LatLng(point.position.latitude, point.position.longitude))
-                                .title(point.name)
-                                .snippet(point.snippet)
-                                .icon(com.google.android.gms.maps.model.BitmapDescriptorFactory.defaultMarker(hue))
-                        )
-                        marker?.tag = point
+                        try {
+                            val marker = googleMap.addMarker(
+                                MarkerOptions()
+                                    .position(LatLng(point.position.latitude, point.position.longitude))
+                                    .title(point.name)
+                                    .snippet(point.snippet)
+                                    .icon(com.google.android.gms.maps.model.BitmapDescriptorFactory.defaultMarker(hue))
+                            )
+                            marker?.tag = point
+                        } catch (e: Exception) {
+                            println("[MapsScreen] Error adding marker: ${e.message}")
+                        }
                     }
                     googleMap.setOnMarkerClickListener { m ->
                         (m.tag as? RecyclingPoint)?.let { onPointSelected(it) }

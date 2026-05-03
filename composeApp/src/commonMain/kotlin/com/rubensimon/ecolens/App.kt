@@ -29,6 +29,7 @@ import androidx.compose.ui.platform.LocalDensity
 
 @Composable
 fun App(startDestination: String = "welcome") {
+    // ── Gestión del Tema ──
     val isSystemDark = isSystemInDarkTheme()
     val settings = remember { Settings() }
     val density = LocalDensity.current
@@ -38,12 +39,8 @@ fun App(startDestination: String = "welcome") {
         if (savedUserId.isNotEmpty()) "menu" else "welcome"
     }
 
+    // Inicializar tema al arrancar
     LaunchedEffect(Unit) {
-        val currentPref = settings.getBoolean("dark_mode", isSystemDark)
-        EcoColors.updateTheme(currentPref)
-    }
-
-    LaunchedEffect(isSystemDark) {
         val currentPref = settings.getBoolean("dark_mode", isSystemDark)
         EcoColors.updateTheme(currentPref)
     }

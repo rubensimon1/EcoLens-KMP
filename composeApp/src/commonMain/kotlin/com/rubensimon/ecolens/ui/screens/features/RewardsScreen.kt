@@ -178,31 +178,46 @@ fun RewardsScreen(onBackClick: () -> Unit) {
                         contentPadding = PaddingValues(bottom = 100.dp, top = 4.dp)
                     ) {
                         items(coupons) { coupon ->
+                            var isRedeeming by remember { mutableStateOf(false) }
                             CouponCard(
                                 coupon = coupon,
                                 currentPoints = puntos,
                                 onRedeem = {
-                                    if (puntos >= coupon.pointsCost) {
-                                        scope.launch {
-                                            val userId = UserRepository().getCurrentSessionUserId() ?: return@launch
-                                            val redemption = com.rubensimon.ecolens.data.models.social.RedemptionModel(
-                                                user_id = userId,
-                                                cupon_id = coupon.id,
-                                                nombre_cupon = coupon.title,
-                                                puntos_gastados = coupon.pointsCost
-                                            )
-                                            val success = UserRepository().redeemCoupon(redemption)
-                                            if (success) {
-                                                // Descontar puntos de verdad
-                                                PointsManager.subtractPoints(coupon.pointsCost)
-                                                puntos = PointsManager.getPoints()
-                                                
-                                                redeemedCoupons = listOf(coupon) + redeemedCoupons
-                                                snackbarMessage = "✅ ¡${coupon.title} canjeado!"
-                                            }
-                                        }
-                                    }
-                                }
+                                     if (puntos >= coupon.pointsCost && !isRedeeming) {
+                                         scope.launch {
+                                             isRedeeming = true
+                                             val userId = UserRepository().getCurrentSessionUserId()
+                                             if (userId == null) {
+                                                 snackbarMessage = "❌ Sesión no válida. Por favor, reidentifícate."
+                                                 isRedeeming = false
+                                                 return@launch
+                                             }
+                                             
+                                             val redemption = com.rubensimon.ecolens.data.models.social.RedemptionModel(
+                                                 user_id = userId,
+                                                 cupon_id = coupon.id,
+                                                 nombre_cupon = coupon.title,
+                                                 puntos_gastados = coupon.pointsCost
+                                             )
+                                             
+                                             val success = UserRepository().redeemCoupon(redemption)
+                                             if (success) {
+                                                 // Descontar puntos de verdad
+                                                 val subSuccess = PointsManager.subtractPoints(coupon.pointsCost)
+                                                 if (subSuccess) {
+                                                     puntos = PointsManager.getPoints()
+                                                     redeemedCoupons = listOf(coupon) + redeemedCoupons
+                                                     snackbarMessage = "✅ ¡${coupon.title} canjeado!"
+                                                 } else {
+                                                     snackbarMessage = "❌ Error al descontar puntos locales"
+                                                 }
+                                             } else {
+                                                 snackbarMessage = "❌ Error en el servidor al canjear. Inténtalo de nuevo."
+                                             }
+                                             isRedeeming = false
+                                         }
+                                     }
+                                 }
                             )
                         }
                     }

@@ -148,26 +148,34 @@ fun CollectionScreen(onBackClick: () -> Unit) {
                 }
             }
 
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(3),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                contentPadding = PaddingValues(bottom = 100.dp, top = 8.dp)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.TopCenter
             ) {
-                items(ecoObjects) { obj ->
-                    val isUnlocked = obj.key in unlockedSet || obj.name in unlockedSet
-                    CollectionCell(
-                        emoji = obj.emoji,
-                        name = if (isUnlocked) obj.name else "???",
-                        container = if (isUnlocked) obj.container else "",
-                        isUnlocked = isUnlocked,
-                        onClick = {
-                            if (isUnlocked) {
-                                selectedObject = obj
-                                showSheet = true
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 140.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    contentPadding = PaddingValues(bottom = 100.dp, top = 8.dp),
+                    modifier = Modifier.widthIn(max = 800.dp)
+                ) {
+                    items(ecoObjects) { obj ->
+                        val isUnlocked = obj.key in unlockedSet || obj.name in unlockedSet
+                        CollectionCell(
+                            emoji = obj.emoji,
+                            name = if (isUnlocked) obj.name else "???",
+                            container = if (isUnlocked) obj.container else "",
+                            isUnlocked = isUnlocked,
+                            onClick = {
+                                if (isUnlocked) {
+                                    selectedObject = obj
+                                    showSheet = true
+                                }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
@@ -267,20 +275,20 @@ private fun CollectionCell(
     GlassCard(
         modifier = Modifier
             .fillMaxWidth()
-            .height(130.dp)
+            .aspectRatio(0.9f)
             .clickable(enabled = isUnlocked, onClick = onClick),
         backgroundColor = if (isUnlocked) containerColor.copy(alpha = 0.15f) else EcoColors.CardPrimary.copy(alpha = 0.5f),
-        cornerRadius = 28
+        cornerRadius = 24
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(8.dp),
+            modifier = Modifier.fillMaxSize().padding(4.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(60.dp)
+                    .size(54.dp)
                     .clip(CircleShape)
                     .background(
                         if (isUnlocked) {
@@ -291,26 +299,28 @@ private fun CollectionCell(
                     )
             ) {
                 if (isUnlocked) {
-                    Text(emoji, fontSize = 40.sp)
+                    Text(emoji, fontSize = 36.sp)
                 } else {
                     Icon(
                         Icons.Default.Lock, 
                         null, 
                         tint = EcoColors.TextSecondary.copy(alpha = 0.3f),
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
             
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             
             Text(
                 text = name,
                 color = if (isUnlocked) EcoColors.TextPrimary else EcoColors.TextSecondary.copy(alpha = 0.6f),
-                fontSize = 12.sp,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
-                maxLines = 1
+                maxLines = 2,
+                lineHeight = 13.sp,
+                modifier = Modifier.padding(horizontal = 2.dp)
             )
             
             if (isUnlocked) {
