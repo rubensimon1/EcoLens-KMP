@@ -1,0 +1,79 @@
+Calculating task graph as configuration cache cannot be reused because file 'gradle/libs.versions.toml' has changed.
+Type-safe project accessors is an incubating feature.
+> Task :composeApp:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :composeApp:convertXmlValueResourcesForIosMain NO-SOURCE
+> Task :composeApp:convertXmlValueResourcesForAppleMain NO-SOURCE
+> Task :composeApp:copyNonXmlValueResourcesForIosArm64Main NO-SOURCE
+> Task :composeApp:convertXmlValueResourcesForNativeMain NO-SOURCE
+> Task :composeApp:copyNonXmlValueResourcesForAppleMain NO-SOURCE
+> Task :composeApp:copyNonXmlValueResourcesForIosMain NO-SOURCE
+> Task :composeApp:copyNonXmlValueResourcesForNativeMain NO-SOURCE
+> Task :composeApp:convertXmlValueResourcesForIosArm64Main NO-SOURCE
+> Task :composeApp:copyNonXmlValueResourcesForCommonMain
+> Task :composeApp:convertXmlValueResourcesForCommonMain NO-SOURCE
+> Task :composeApp:prepareComposeResourcesTaskForIosMain NO-SOURCE
+> Task :composeApp:prepareComposeResourcesTaskForNativeMain NO-SOURCE
+> Task :composeApp:prepareComposeResourcesTaskForIosArm64Main NO-SOURCE
+> Task :composeApp:prepareComposeResourcesTaskForAppleMain NO-SOURCE
+> Task :composeApp:generateResourceAccessorsForIosMain NO-SOURCE
+> Task :composeApp:generateResourceAccessorsForNativeMain NO-SOURCE
+> Task :composeApp:generateResourceAccessorsForIosArm64Main NO-SOURCE
+> Task :composeApp:generateResourceAccessorsForAppleMain NO-SOURCE
+> Task :composeApp:prepareComposeResourcesTaskForCommonMain
+> Task :composeApp:generateResourceAccessorsForCommonMain
+> Task :composeApp:generateExpectResourceCollectorsForCommonMain
+> Task :composeApp:generateComposeResClass
+> Task :composeApp:generateActualResourceCollectorsForIosArm64Main
+
+> Task :composeApp:compileKotlinIosArm64 FAILED
+e: file:///Users/rvbeens/Documentos/Instituto/DAM2V/TGF/Ecolens/composeApp/src/commonMain/kotlin/com/rubensimon/ecolens/App.kt:48:5 This material API is experimental and is likely to change or to be removed in the future.
+e: file:///Users/rvbeens/Documentos/Instituto/DAM2V/TGF/Ecolens/composeApp/src/commonMain/kotlin/com/rubensimon/ecolens/ui/components/GlassComponents.kt:156:18 Unresolved reference 'OutlinedTextFieldDefaults'.
+e: file:///Users/rvbeens/Documentos/Instituto/DAM2V/TGF/Ecolens/composeApp/src/commonMain/kotlin/com/rubensimon/ecolens/ui/components/GlassComponents.kt:198:5 Unresolved reference 'HorizontalDivider'.
+e: file:///Users/rvbeens/Documentos/Instituto/DAM2V/TGF/Ecolens/composeApp/src/commonMain/kotlin/com/rubensimon/ecolens/ui/screens/features/CollectionScreen.kt:57:44 Unresolved reference 'topAppBarColors'.
+e: file:///Users/rvbeens/Documentos/Instituto/DAM2V/TGF/Ecolens/composeApp/src/commonMain/kotlin/com/rubensimon/ecolens/ui/screens/features/CollectionScreen.kt:93:32 Argument type mismatch: actual type is 'kotlin.Function0<kotlin.Float>', but 'kotlin.Float' was expected.
+e: file:///Users/rvbeens/Documentos/Instituto/DAM2V/TGF/Ecolens/composeApp/src/commonMain/kotlin/com/rubensimon/ecolens/ui/screens/features/HistoryScreen.kt:38:44 Unresolved reference 'topAppBarColors'.
+e: file:///Users/rvbeens/Documentos/Instituto/DAM2V/TGF/Ecolens/composeApp/src/commonMain/kotlin/com/rubensimon/ecolens/ui/screens/features/LeaderboardScreen.kt:68:44 Unresolved reference 'topAppBarColors'.
+e: file:///Users/rvbeens/Documentos/Instituto/DAM2V/TGF/Ecolens/composeApp/src/commonMain/kotlin/com/rubensimon/ecolens/ui/screens/features/MapsScreen.kt:50:44 Unresolved reference 'topAppBarColors'.
+e: file:///Users/rvbeens/Documentos/Instituto/DAM2V/TGF/Ecolens/composeApp/src/commonMain/kotlin/com/rubensimon/ecolens/ui/screens/features/RewardsScreen.kt:59:44 Unresolved reference 'topAppBarColors'.
+e: file:///Users/rvbeens/Documentos/Instituto/DAM2V/TGF/Ecolens/composeApp/src/commonMain/kotlin/com/rubensimon/ecolens/ui/screens/features/ScanScreen.kt:53:44 Unresolved reference 'topAppBarColors'.
+e: file:///Users/rvbeens/Documentos/Instituto/DAM2V/TGF/Ecolens/composeApp/src/commonMain/kotlin/com/rubensimon/ecolens/ui/screens/features/UpcyclingScreen.kt:44:44 Unresolved reference 'topAppBarColors'.
+e: file:///Users/rvbeens/Documentos/Instituto/DAM2V/TGF/Ecolens/composeApp/src/commonMain/kotlin/com/rubensimon/ecolens/ui/screens/main/MenuScreen.kt:153:25 None of the following candidates is applicable:
+fun LinearProgressIndicator(modifier: Modifier = ..., color: Color = ..., trackColor: Color = ...): Unit
+fun LinearProgressIndicator(progress: Float, modifier: Modifier = ..., color: Color = ..., trackColor: Color = ...): Unit
+e: file:///Users/rvbeens/Documentos/Instituto/DAM2V/TGF/Ecolens/composeApp/src/commonMain/kotlin/com/rubensimon/ecolens/ui/screens/main/ProfileScreen.kt:92:44 Unresolved reference 'topAppBarColors'.
+e: file:///Users/rvbeens/Documentos/Instituto/DAM2V/TGF/Ecolens/composeApp/src/commonMain/kotlin/com/rubensimon/ecolens/ui/screens/main/ProfileScreen.kt:193:32 Argument type mismatch: actual type is 'kotlin.Function0<kotlin.Float>', but 'kotlin.Float' was expected.
+e: file:///Users/rvbeens/Documentos/Instituto/DAM2V/TGF/Ecolens/composeApp/src/commonMain/kotlin/com/rubensimon/ecolens/ui/screens/main/SettingsScreen.kt:54:9 Unresolved reference 'AlertDialog'.
+e: file:///Users/rvbeens/Documentos/Instituto/DAM2V/TGF/Ecolens/composeApp/src/commonMain/kotlin/com/rubensimon/ecolens/ui/screens/main/SettingsScreen.kt:56:23 @Composable invocations can only happen from the context of a @Composable function
+e: file:///Users/rvbeens/Documentos/Instituto/DAM2V/TGF/Ecolens/composeApp/src/commonMain/kotlin/com/rubensimon/ecolens/ui/screens/main/SettingsScreen.kt:57:22 @Composable invocations can only happen from the context of a @Composable function
+e: file:///Users/rvbeens/Documentos/Instituto/DAM2V/TGF/Ecolens/composeApp/src/commonMain/kotlin/com/rubensimon/ecolens/ui/screens/main/SettingsScreen.kt:59:17 @Composable invocations can only happen from the context of a @Composable function
+e: file:///Users/rvbeens/Documentos/Instituto/DAM2V/TGF/Ecolens/composeApp/src/commonMain/kotlin/com/rubensimon/ecolens/ui/screens/main/SettingsScreen.kt:67:17 @Composable invocations can only happen from the context of a @Composable function
+e: file:///Users/rvbeens/Documentos/Instituto/DAM2V/TGF/Ecolens/composeApp/src/commonMain/kotlin/com/rubensimon/ecolens/ui/screens/main/SettingsScreen.kt:78:9 Unresolved reference 'AlertDialog'.
+e: file:///Users/rvbeens/Documentos/Instituto/DAM2V/TGF/Ecolens/composeApp/src/commonMain/kotlin/com/rubensimon/ecolens/ui/screens/main/SettingsScreen.kt:80:23 @Composable invocations can only happen from the context of a @Composable function
+e: file:///Users/rvbeens/Documentos/Instituto/DAM2V/TGF/Ecolens/composeApp/src/commonMain/kotlin/com/rubensimon/ecolens/ui/screens/main/SettingsScreen.kt:82:17 @Composable invocations can only happen from the context of a @Composable function
+e: file:///Users/rvbeens/Documentos/Instituto/DAM2V/TGF/Ecolens/composeApp/src/commonMain/kotlin/com/rubensimon/ecolens/ui/screens/main/SettingsScreen.kt:90:17 @Composable invocations can only happen from the context of a @Composable function
+e: file:///Users/rvbeens/Documentos/Instituto/DAM2V/TGF/Ecolens/composeApp/src/commonMain/kotlin/com/rubensimon/ecolens/ui/screens/main/SettingsScreen.kt:98:17 @Composable invocations can only happen from the context of a @Composable function
+e: file:///Users/rvbeens/Documentos/Instituto/DAM2V/TGF/Ecolens/composeApp/src/commonMain/kotlin/com/rubensimon/ecolens/ui/screens/main/SettingsScreen.kt:115:44 Unresolved reference 'topAppBarColors'.
+
+[Incubating] Problems report is available at: file:///Users/rvbeens/Documentos/Instituto/DAM2V/TGF/Ecolens/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':composeApp:compileKotlinIosArm64'.
+> Compilation finished with errors
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14.3/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 11s
+7 actionable tasks: 7 executed
+Configuration cache entry stored.

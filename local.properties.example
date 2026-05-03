@@ -1,0 +1,8 @@
+# Copia este archivo a local.properties y rellena valores reales.
+# local.properties NO se versiona.
+
+sdk.dir=/path/to/Android/sdk
+MAPS_API_KEY=your_google_maps_key
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=your_supabase_anon_key
+ML_BACKEND_URL=https://your-backend.example.com/
