@@ -8,10 +8,8 @@ import androidx.compose.ui.interop.UIKitView
 import com.rubensimon.ecolens.utils.MadridPointsFetcherIOS
 import com.rubensimon.ecolens.data.models.maps.RecyclingPoint
 import platform.CoreLocation.CLLocationCoordinate2DMake
-import platform.MapKit.MKCoordinateRegionMake
-import platform.MapKit.MKCoordinateSpanMake
-import platform.MapKit.MKMapView
-import platform.MapKit.MKPointAnnotation
+import platform.MapKit.*
+import platform.UIKit.NSObject
 import kotlinx.cinterop.ExperimentalForeignApi
 
 @OptIn(ExperimentalForeignApi::class)
@@ -28,6 +26,22 @@ actual fun PlatformMapView(
     val recyclingPoints = remember(allPoints, filter) {
         if (filter == "TODOS") allPoints
         else allPoints.filter { it.kind == filter }
+    }
+
+    // Delegado para capturar clics en los pins
+    val mapDelegate = remember {
+        object : NSObject(), MKMapViewDelegateProtocol {
+            override fun mapView(mapView: MKMapView, didSelectAnnotationView: MKAnnotationView) {
+                val annotation = didSelectAnnotationView.annotation as? MKPointAnnotation ?: return
+                val title = annotation.title ?: ""
+                val point = allPoints.find { it.name == title }
+                if (point != null) {
+                    onPointSelected(point)
+                }
+                // Deseleccionar para que se pueda volver a clicar
+                mapView.deselectAnnotation(annotation, animated = true)
+            }
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -50,11 +64,12 @@ actual fun PlatformMapView(
                 val span = MKCoordinateSpanMake(0.1, 0.1)
                 mapView.setRegion(MKCoordinateRegionMake(madridCenter, span), animated = true)
                 mapView.showsUserLocation = true
+                mapView.delegate = mapDelegate
                 mapViewRef = mapView
                 mapView
             },
             update = { mapView ->
-                if (pointsSnapshot.isNotEmpty() && mapView.annotations.size <= 1) {
+                if (pointsSnapshot.isNotEmpty() && (mapView.annotations.size <= 1 || filter != "TODOS")) {
                     mapView.removeAnnotations(mapView.annotations)
                     val annotations = pointsSnapshot.map { point ->
                         val annotation = MKPointAnnotation()
