@@ -65,7 +65,7 @@ kotlin {
             baseName = "ComposeApp"
             isStatic = true
             // Enlace explícito de frameworks de sistema
-            linkerOpts("-framework", "AVFoundation", "-framework", "AVFAudio", "-framework", "AudioToolbox", "-framework", "UserNotifications")
+            linkerOpts("-framework", "AVFoundation", "-framework", "AVFAudio", "-framework", "AudioToolbox", "-framework", "UserNotifications", "-framework", "MapKit", "-framework", "PhotosUI")
         }
     }
     
