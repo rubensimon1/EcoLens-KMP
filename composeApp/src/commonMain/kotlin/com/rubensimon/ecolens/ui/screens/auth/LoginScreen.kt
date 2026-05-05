@@ -193,9 +193,12 @@ fun LoginScreen(
                                 } else {
                                     client.auth.signInWith(Email) { this.email = email.trim(); this.password = password }
                                 }
-                                val userId = client.auth.currentSessionOrNull()?.user?.id ?: ""
+                                val user = client.auth.currentSessionOrNull()?.user
+                                val userId = user?.id ?: ""
+                                val userEmail = user?.email ?: email
                                 settings.putString("user_id", userId)
-                                settings.putString("username", if (isSignUpMode) username else email.substringBefore("@"))
+                                settings.putString("email", userEmail)
+                                settings.putString("username", if (isSignUpMode) username else userEmail.substringBefore("@"))
                                 PointsManager.setUserId(userId)
                                 PointsManager.loadFromSupabase(userId)
                                 onLoginSuccess()

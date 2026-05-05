@@ -8,6 +8,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.tooling.preview.Preview
 import com.russhwolf.settings.Settings
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
 
 /**
  * Única Activity del proyecto KMP — punto de entrada Android.
@@ -28,6 +31,16 @@ class MainActivity : ComponentActivity() {
         com.rubensimon.ecolens.utils.PlatformAudio.setContext(this)
         com.rubensimon.ecolens.utils.NotificationHelper.setContext(this)
         com.rubensimon.ecolens.utils.NotificationHelper.createNotificationChannel(this)
+
+        // Pre-calentar el cliente Supabase en background para evitar
+        // que el hilo principal se bloquee en la primera inicialización
+        MainScope().launch(Dispatchers.IO) {
+            try {
+                com.rubensimon.ecolens.data.network.SupabaseClientProvider.client
+            } catch (e: Exception) {
+                android.util.Log.w("EcoLens", "Supabase pre-warm error (ignorable): ${e.message}")
+            }
+        }
 
         setContent {
             // Comprobar si hay sesión guardada para saltar al menú

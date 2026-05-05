@@ -29,7 +29,6 @@ actual fun PlatformMapView(
 ) {
     var hasLocationPermission by remember { mutableStateOf(false) }
     var allPoints by remember { mutableStateOf<List<RecyclingPoint>>(emptyList()) }
-    var hasCenteredOnce by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
     var mapInstance by remember { mutableStateOf<com.google.android.gms.maps.GoogleMap?>(null) }
@@ -63,39 +62,40 @@ actual fun PlatformMapView(
         }
     }
 
-    // Lógica de centrado reactiva: solo centra una vez al inicio o cuando se pulsa el botón
-    LaunchedEffect(hasLocationPermission, recenterTrigger) {
-        val googleMap = mapInstance ?: return@LaunchedEffect
-        
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            try {
-                googleMap.isMyLocationEnabled = true
-                googleMap.uiSettings.apply {
-                    isMyLocationButtonEnabled = true
-                    isScrollGesturesEnabled = true
-                    isZoomGesturesEnabled = true
-                    isTiltGesturesEnabled = true
-                    isRotateGesturesEnabled = true
+    // Función auxiliar para centrar el mapa en la ubicación GPS actual
+    fun centerOnGps(googleMap: com.google.android.gms.maps.GoogleMap) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
+        try {
+            googleMap.isMyLocationEnabled = true
+            // Primero intentamos con la última ubicación conocida (rápido)
+            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                if (location != null) {
+                    googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(location.latitude, location.longitude), 17f))
                 }
-
-                // Solo centramos si no lo hemos hecho nunca O si el trigger es > 0 (botón pulsado)
-                if (!hasCenteredOnce || recenterTrigger > 0) {
-                    fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-                        if (location != null) {
-                            googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(location.latitude, location.longitude), 17f))
-                            hasCenteredOnce = true
-                        }
+            }
+            // Luego pedimos una ubicación fresca de alta precisión (GPS real)
+            fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+                .addOnSuccessListener { location ->
+                    if (location != null) {
+                        googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(location.latitude, location.longitude), 17f))
                     }
-
-                    fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
-                        .addOnSuccessListener { location ->
-                            if (location != null) {
-                                googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(location.latitude, location.longitude), 17f))
-                                hasCenteredOnce = true
-                            }
-                        }
                 }
-            } catch (e: SecurityException) { }
+        } catch (e: SecurityException) {
+            println("[MapsScreen] SecurityException al obtener ubicación: ${e.message}")
+        }
+    }
+
+    // Recentrar cuando se pulsa el botón del FAB
+    LaunchedEffect(recenterTrigger) {
+        if (recenterTrigger > 0) {
+            mapInstance?.let { centerOnGps(it) }
+        }
+    }
+
+    // Recentrar cuando se concede el permiso de ubicación
+    LaunchedEffect(hasLocationPermission) {
+        if (hasLocationPermission) {
+            mapInstance?.let { centerOnGps(it) }
         }
     }
 
@@ -133,9 +133,18 @@ actual fun PlatformMapView(
                         isMyLocationButtonEnabled = true
                         isScrollGesturesEnabled = true
                         isZoomGesturesEnabled = true
+                        isTiltGesturesEnabled = true
+                        isRotateGesturesEnabled = true
                         isCompassEnabled = true
                     }
-                    googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(40.4168, -3.7038), 10f))
+                    
+                    // Centrar inmediatamente en la ubicación GPS del usuario
+                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                        centerOnGps(googleMap)
+                    } else {
+                        // Fallback: si no hay permiso, poner zoom amplio en España
+                        googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(40.4168, -3.7038), 6f))
+                    }
                 }
             }
         },

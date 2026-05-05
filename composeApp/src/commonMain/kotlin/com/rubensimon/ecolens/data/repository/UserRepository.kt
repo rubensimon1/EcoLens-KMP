@@ -191,8 +191,8 @@ class UserRepository {
 
     suspend fun getCouponsFromDb(): List<Coupon> {
         return try {
-            // La tabla 'cupones' contiene las recompensas disponibles
-            client.from("cupones")
+            // La tabla 'cupones_tienda' contiene las recompensas disponibles
+            client.from("cupones_tienda")
                 .select()
                 .decodeList<Coupon>()
         } catch (e: Exception) {
@@ -253,6 +253,14 @@ class UserRepository {
         }
     }
 
+    suspend fun getCurrentUserEmail(): String? {
+        return try {
+            client.auth.currentSessionOrNull()?.user?.email
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     suspend fun signIn(email: String, password: String): Boolean {
         return try {
             client.auth.signInWith(io.github.jan.supabase.auth.providers.builtin.Email) {
@@ -289,12 +297,14 @@ class UserRepository {
 
     suspend fun updateUserEmail(newEmail: String): Boolean {
         return try {
+            // En Supabase v3, updateUser envía un correo de confirmación al nuevo email
             client.auth.updateUser {
                 email = newEmail
             }
+            println("[UserRepository] ✉️ Solicitud de cambio de email enviada a: $newEmail")
             true
         } catch (e: Exception) {
-            println("[UserRepository] Error updateEmail: ${e.message}")
+            println("[UserRepository] ❌ Error updateEmail: ${e.message}")
             false
         }
     }
@@ -304,9 +314,10 @@ class UserRepository {
             client.auth.updateUser {
                 password = newPassword
             }
+            println("[UserRepository] 🔑 Contraseña actualizada en Supabase")
             true
         } catch (e: Exception) {
-            println("[UserRepository] Error updatePassword: ${e.message}")
+            println("[UserRepository] ❌ Error updatePassword: ${e.message}")
             false
         }
     }

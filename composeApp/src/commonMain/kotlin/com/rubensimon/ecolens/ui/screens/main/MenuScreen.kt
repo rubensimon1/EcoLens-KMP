@@ -54,7 +54,7 @@ fun MenuScreen(
     val settings = remember { Settings() }
     val username = remember { settings.getString("username", "EcoUser") }
     var puntos by remember { mutableIntStateOf(PointsManager.getPoints()) }
-    val totalScans = remember { PointsManager.getTotalScans() }
+    var totalScans by remember { mutableIntStateOf(PointsManager.getTotalScans()) }
     
     val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
     val today = now.date
@@ -67,14 +67,8 @@ fun MenuScreen(
     var dailyScans by remember { mutableStateOf<List<com.rubensimon.ecolens.data.models.social.HistoryItem>>(emptyList()) }
     var dailyRedemptions by remember { mutableStateOf<List<com.rubensimon.ecolens.data.models.social.RedemptionModel>>(emptyList()) }
     
-    val weeklyScansData = remember(totalScans, refreshTrigger) {
-        val firstDay = today.plus(-(today.dayOfWeek.ordinal), DateTimeUnit.DAY)
-        (0..6).map { i ->
-            val date = firstDay.plus(i, DateTimeUnit.DAY)
-            // Contamos objetos, no puntos acumulados
-            HistoryManager.getHistoryForDate(date.dayOfMonth, date.monthNumber).size
-        }
-    }
+    // Datos del gráfico semanal — se recalculan con cada refresh
+    var weeklyScansData by remember { mutableStateOf(List(7) { 0 }) }
     
     val userRepo = remember { UserRepository() }
     var globalFeedItems by remember { mutableStateOf<List<com.rubensimon.ecolens.data.models.social.HistoryItemModel>>(emptyList()) }
@@ -101,6 +95,17 @@ fun MenuScreen(
             // ── Sincronización Inicial con Supabase ──
             PointsManager.loadFromSupabase(userId)
             HistoryManager.loadFromDatabase(userId)
+            
+            // ── Actualizar datos locales tras sincronización ──
+            puntos = PointsManager.getPoints()
+            totalScans = PointsManager.getTotalScans()
+            
+            // ── Recalcular gráfico semanal ──
+            val firstDay = today.plus(-(today.dayOfWeek.ordinal), DateTimeUnit.DAY)
+            weeklyScansData = (0..6).map { i ->
+                val date = firstDay.plus(i, DateTimeUnit.DAY)
+                HistoryManager.getHistoryForDate(date.dayOfMonth, date.monthNumber).size
+            }
             
             // ── Carga de Feed Global ──
             val activities = userRepo.getGlobalActivity(10)
@@ -489,10 +494,10 @@ fun MenuScreen(
                                 Text("🎁", fontSize = 24.sp)
                                 Spacer(modifier = Modifier.width(16.dp))
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(red.nombre_cupon ?: "Cupón", color = EcoColors.TextPrimary, fontWeight = FontWeight.Bold)
-                                    Text(red.created_at?.substringBefore("T") ?: "", color = EcoColors.TextSecondary, fontSize = 12.sp)
+                                    Text("Cupón Canjeado", color = EcoColors.TextPrimary, fontWeight = FontWeight.Bold)
+                                    Text(red.fechaCanje?.substringBefore("T") ?: "", color = EcoColors.TextSecondary, fontSize = 12.sp)
                                 }
-                                Text("-${red.puntos_gastados}", color = Color.Red.copy(alpha = 0.7f), fontWeight = FontWeight.Bold)
+                                Text("-??", color = Color.Red.copy(alpha = 0.7f), fontWeight = FontWeight.Bold)
                             }
                         }
                     }
