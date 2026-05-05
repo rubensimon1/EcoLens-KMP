@@ -129,7 +129,7 @@ fun GlassCard(
 ) {
     val shape = RoundedCornerShape(cornerRadius.dp)
     val isDark = EcoColors.isDark
-    
+
     Box(
         modifier = modifier
             .clip(shape)

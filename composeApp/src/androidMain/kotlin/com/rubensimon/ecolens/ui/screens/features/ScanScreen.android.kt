@@ -146,6 +146,11 @@ actual fun PlatformCameraView(
                                 resultMessage = "✅ $label (+$points pts)\n$message"
                                 PointsManager.addPoints(points, "scan")
                                 PointsManager.incrementScans(label, points)
+                                HistoryManager.addHistoryItem(
+                                    objectName = label,
+                                    points = points,
+                                    userId = PointsManager.getUserId()
+                                )
                                 PlatformAudio.playSuccess()
                                 onScanComplete(label, points)
                                 isScanning = false

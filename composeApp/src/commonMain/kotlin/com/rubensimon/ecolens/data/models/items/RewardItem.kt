@@ -1,6 +1,8 @@
 package com.rubensimon.ecolens.data.models.items
 
 import androidx.compose.ui.graphics.Color
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 /**
  * Premio canjeable en la tienda de recompensas.
@@ -13,15 +15,18 @@ data class RewardItem(
 )
 
 /**
- * Datos de un cupón cargado desde Supabase.
+ * Datos de un cupón cargado desde la tabla `cupones_tienda` en Supabase.
  */
+@Serializable
 data class Coupon(
     val id: String = "",
-    val title: String,
-    val description: String = "",
-    val pointsCost: Int,
-    val store: String = "",
+    @SerialName("tienda_id") val tiendaId: String? = null,
+    @SerialName("titulo") val title: String,
+    @SerialName("descripcion") val description: String = "",
+    @SerialName("coste_puntos") val pointsCost: Int,
+    val stock: Int = 0,
+    @SerialName("dias_validez") val daysValidity: Int = 0,
     val category: String = "",
-    val expiresAt: String? = null,
-    val redeemedAt: String? = null // Nueva propiedad para historial
+    val activo: Boolean = true,
+    @SerialName("created_at") val createdAt: String? = null
 )

@@ -11,6 +11,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 /**
  * Gestor de historial de escaneos.
@@ -82,7 +85,7 @@ object HistoryManager {
 
             if (remoteItems.isNotEmpty()) {
                 if (force || localItems.isEmpty() || (now - lastSync) > oneDayMs) {
-                    val localFormat = remoteItems.map { remote ->
+                    val remoteAsLocal = remoteItems.map { remote ->
                         HistoryItem(
                             nombre = remote.object_name,
                             puntos = remote.points,
@@ -90,9 +93,14 @@ object HistoryManager {
                             emoji = getEmojiForObject(remote.object_name)
                         )
                     }
-                    saveLocalHistory(localFormat)
+                    // Fusionar: mantener items locales recientes que aún no estén en remoto
+                    val remoteKeys = remoteAsLocal.map { "${it.nombre}|${it.fecha}" }.toSet()
+                    val localOnly = localItems.filter { "${it.nombre}|${it.fecha}" !in remoteKeys }
+                    val merged = (localOnly + remoteAsLocal).sortedByDescending { it.fecha }
+                    
+                    saveLocalHistory(merged)
                     settings.putLong(KEY_LAST_SYNC, now)
-                    println("[HistoryManager] Loaded ${remoteItems.size} items from Supabase (force=$force)")
+                    println("[HistoryManager] Merged: ${localOnly.size} local-only + ${remoteAsLocal.size} remote = ${merged.size} total (force=$force)")
                     true
                 } else {
                     false
@@ -189,34 +197,41 @@ object HistoryManager {
 
     private fun formatRemoteDate(remoteDate: String?): String {
         if (remoteDate == null) return simpleDate()
-        // Simplified: extract date portion (ISO 8601 → dd/MM HH:mm)
+        // Convertir fecha remota UTC a hora local para consistencia con simpleDate()
         return try {
-            // "2025-04-10T14:30:00.000Z" → "10/04 14:30"
-            val parts = remoteDate.split("T")
-            if (parts.size >= 2) {
-                val dateParts = parts[0].split("-")
-                val timeParts = parts[1].take(5)
-                if (dateParts.size == 3) {
-                    "${dateParts[2]}/${dateParts[1]} $timeParts"
-                } else remoteDate
-            } else remoteDate
+            val cleanDate = remoteDate.substringBefore("+").let { if (it.endsWith("Z")) it else it + "Z" }
+            val instant = Instant.parse(cleanDate)
+            val local = instant.toLocalDateTime(TimeZone.currentSystemDefault())
+            val dd = local.dayOfMonth.toString().padStart(2, '0')
+            val mm = local.monthNumber.toString().padStart(2, '0')
+            val hh = local.hour.toString().padStart(2, '0')
+            val min = local.minute.toString().padStart(2, '0')
+            "$dd/$mm $hh:$min"
         } catch (_: Exception) {
-            remoteDate
+            // Fallback: parseo manual si el formato no es ISO estándar
+            try {
+                val parts = remoteDate.split("T")
+                if (parts.size >= 2) {
+                    val dateParts = parts[0].split("-")
+                    val timeParts = parts[1].take(5)
+                    if (dateParts.size == 3) {
+                        "${dateParts[2]}/${dateParts[1]} $timeParts"
+                    } else remoteDate
+                } else remoteDate
+            } catch (_: Exception) {
+                remoteDate
+            }
         }
     }
 
     private fun simpleDate(): String {
-        // ISO instant → dd/MM HH:mm
-        val local = com.rubensimon.ecolens.utils.TimeUtils.getCurrentIsoDate() // UTC ISO - sufficient for history display
-        return try {
-            val parts = local.split("T")
-            if (parts.size >= 2) {
-                val dateParts = parts[0].split("-")
-                val timeParts = parts[1].take(5)
-                "${dateParts[2]}/${dateParts[1]} $timeParts"
-            } else local
-        } catch (_: Exception) {
-            local
-        }
+        // Usar hora LOCAL (no UTC) para que coincida con los días del gráfico
+        val now = Clock.System.now()
+        val local = now.toLocalDateTime(TimeZone.currentSystemDefault())
+        val dd = local.dayOfMonth.toString().padStart(2, '0')
+        val mm = local.monthNumber.toString().padStart(2, '0')
+        val hh = local.hour.toString().padStart(2, '0')
+        val min = local.minute.toString().padStart(2, '0')
+        return "$dd/$mm $hh:$min"
     }
 }

@@ -26,6 +26,7 @@ import com.rubensimon.ecolens.data.repository.UserRepository
 import com.rubensimon.ecolens.ui.components.*
 import com.rubensimon.ecolens.utils.PointsManager
 import kotlinx.coroutines.launch
+import kotlinx.datetime.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 
 /**
@@ -46,28 +47,26 @@ fun RewardsScreen(onBackClick: () -> Unit) {
     var redeemedCoupons by remember { mutableStateOf<List<Coupon>>(emptyList()) }
 
     LaunchedEffect(Unit) {
-        scope.launch {
-            // Sincronizar puntos antes de mostrar
-            val userId = UserRepository().getCurrentSessionUserId()
-            if (userId != null) {
-                PointsManager.loadFromSupabase(userId)
-                puntos = PointsManager.getPoints()
-                
-                val dbRedemptions = UserRepository().getRedemptions(userId)
-                redeemedCoupons = dbRedemptions.map { r ->
-                    Coupon(
-                        id = r.cupon_id, 
-                        title = r.nombre_cupon ?: "Cupón", 
-                        pointsCost = r.puntos_gastados,
-                        redeemedAt = r.created_at
-                    )
-                }
+        val dbCoupons = UserRepository().getCouponsFromDb()
+        coupons = dbCoupons.ifEmpty { getSampleCoupons() }
+
+        val userId = UserRepository().getCurrentSessionUserId()
+        if (userId != null) {
+            PointsManager.loadFromSupabase(userId)
+            puntos = PointsManager.getPoints()
+
+            val dbRedemptions = UserRepository().getRedemptions(userId)
+            redeemedCoupons = dbRedemptions.map { r ->
+                val matchingCoupon = coupons.find { it.id == r.cupon_id }
+                Coupon(
+                    id = r.cupon_id,
+                    title = matchingCoupon?.title ?: "Cupón Canjeado",
+                    pointsCost = matchingCoupon?.pointsCost ?: 0,
+                    createdAt = r.fechaCanje
+                )
             }
-            
-            val dbCoupons = UserRepository().getCouponsFromDb()
-            coupons = dbCoupons.ifEmpty { getSampleCoupons() }
-            isLoading = false
         }
+        isLoading = false
     }
 
     Scaffold(
@@ -193,11 +192,17 @@ fun RewardsScreen(onBackClick: () -> Unit) {
                                                  return@launch
                                              }
                                              
+                                             val now = Clock.System.now()
+                                             val expiration = now.plus(30, DateTimeUnit.DAY, TimeZone.UTC)
+                                             
                                              val redemption = com.rubensimon.ecolens.data.models.social.RedemptionModel(
                                                  user_id = userId,
                                                  cupon_id = coupon.id,
-                                                 nombre_cupon = coupon.title,
-                                                 puntos_gastados = coupon.pointsCost
+                                                 tienda_id = coupon.tiendaId,
+                                                 codigo_qr = "VAL-" + now.toEpochMilliseconds().toString().takeLast(6),
+                                                 fechaCanje = now.toString(),
+                                                 fechaUso = now.toString(),
+                                                 fechaExpiracion = expiration.toString()
                                              )
                                              
                                              val success = UserRepository().redeemCoupon(redemption)
@@ -235,7 +240,7 @@ fun RewardsScreen(onBackClick: () -> Unit) {
                     } else {
                         val groupedRedemptions = remember(redeemedCoupons) {
                             redeemedCoupons.groupBy { 
-                                it.redeemedAt?.substringBefore("T") ?: "Reciente" 
+                                it.createdAt?.substringBefore("T") ?: "Reciente" 
                             }
                         }
 
@@ -346,10 +351,10 @@ private fun CouponCard(
 }
 
 private fun getSampleCoupons() = listOf(
-    Coupon(id = "1", title = "1 día de alquiler", description = "Bicicleta eléctrica incluida", pointsCost = 80, category = "transporte"),
-    Coupon(id = "2", title = "10% en accesorios", description = "Descuento en accesorios de móvil y PC", pointsCost = 200, category = "electrónica"),
-    Coupon(id = "3", title = "10% descuento", description = "En cualquier libro", pointsCost = 60, category = "comercio"),
-    Coupon(id = "4", title = "Pizza Mediana Gratis", description = "Cualquier ingrediente", pointsCost = 150, category = "restaurante"),
-    Coupon(id = "5", title = "Café + Croissant", description = "Desayuno completo gratis", pointsCost = 50, category = "cafetería"),
-    Coupon(id = "6", title = "5€ de descuento", description = "En compras superiores a 20€", pointsCost = 100, category = "supermercado"),
+    Coupon(id = "709f4f39-4658-49bb-be40-124a942f91df", title = "1 día de alquiler", description = "Bicicleta eléctrica incluida", pointsCost = 80, category = "transporte"),
+    Coupon(id = "835c679a-bf8d-4c53-b464-76f816e94cb5", title = "10% en accesorios", description = "Descuento en accesorios de móvil y PC", pointsCost = 200, category = "electrónica"),
+    Coupon(id = "b1e1b1e1-b1e1-b1e1-b1e1-b1e1b1e1b1e1", title = "10% descuento", description = "En cualquier libro", pointsCost = 60, category = "comercio"),
+    Coupon(id = "c1c1c1c1-c1c1-c1c1-c1c1-c1c1c1c1c1c1", title = "Pizza Mediana Gratis", description = "Cualquier ingrediente", pointsCost = 150, category = "restaurante"),
+    Coupon(id = "d1d1d1d1-d1d1-d1d1-d1d1-d1d1d1d1d1d1", title = "Café + Croissant", description = "Desayuno completo gratis", pointsCost = 50, category = "cafetería"),
+    Coupon(id = "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1", title = "5€ de descuento", description = "En compras superiores a 20€", pointsCost = 100, category = "supermercado"),
 )

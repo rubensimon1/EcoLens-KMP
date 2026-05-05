@@ -1,5 +1,6 @@
 package com.rubensimon.ecolens.data.models.social
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
@@ -10,10 +11,10 @@ data class RedemptionModel(
     val id: String? = null,
     val user_id: String, 
     val cupon_id: String,
-    val nombre_cupon: String? = null,
-    val puntos_gastados: Int = 0,
-    val tienda_id: String? = "tienda_general",
+    val tienda_id: String? = null,
     val codigo_qr: String? = null,
     val estado: String = "activo",
-    val created_at: String? = null
+    @SerialName("fecha_canje") val fechaCanje: String? = null,
+    @SerialName("fecha_uso") val fechaUso: String? = null,
+    @SerialName("fecha_expiracion") val fechaExpiracion: String? = null
 )

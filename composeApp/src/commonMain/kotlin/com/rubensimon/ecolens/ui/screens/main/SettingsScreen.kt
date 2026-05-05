@@ -65,21 +65,35 @@ fun SettingsScreen(
     var showInfoDialog by remember { mutableStateOf(false) }
     var infoTitle by remember { mutableStateOf("") }
     var infoText by remember { mutableStateOf("") }
-    var statusMessage by remember { mutableStateOf("") }
+    var currentDisplayName by remember { mutableStateOf(username) }
+    var currentEmail by remember { mutableStateOf(email) }
+    var currentBio by remember { mutableStateOf("") }
 
-    var newDisplayName by remember { mutableStateOf(username) }
+    var newDisplayName by remember { mutableStateOf("") }
     var newBio by remember { mutableStateOf("") }
     var newEmail by remember { mutableStateOf("") }
     var oldPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var repeatNewPassword by remember { mutableStateOf("") }
 
+    // Estado de mensajes
+    var statusMessage by remember { mutableStateOf("") }
+    var isErrorStatus by remember { mutableStateOf(false) }
+
     LaunchedEffect(userId) {
         if (userId.isNotEmpty()) {
-            val user = UserRepository().getUserById(userId)
+            val repo = UserRepository()
+            // Recuperar email real de la sesión
+            repo.getCurrentUserEmail()?.let { 
+                currentEmail = it 
+            }
+            
+            val user = repo.getUserById(userId)
             user?.let {
-                newDisplayName = it.display_name ?: it.username
-                newBio = it.bio ?: ""
+                currentDisplayName = it.display_name ?: it.username
+                currentBio = it.bio ?: ""
+                newDisplayName = currentDisplayName
+                newBio = currentBio
                 
                 // ── Sincronización Inicial: solo si el local está vacío o es la primera vez ──
                 if (!settings.hasKey("sync_done")) {
@@ -167,17 +181,18 @@ fun SettingsScreen(
                 scope.launch {
                     val success = UserRepository().updateUserEmail(newEmail)
                     if (success) {
-                        settings.putString("email", newEmail)
-                        statusMessage = "✅ Email actualizado"
+                        statusMessage = "📩 Confirma el cambio en tu nuevo email: $newEmail"
+                        isErrorStatus = false
                         showChangeEmailDialog = false
                     } else {
-                        statusMessage = "❌ Error al actualizar email"
+                        statusMessage = "❌ Error: Verifica el formato del email"
+                        isErrorStatus = true
                     }
                 }
             }
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Actual: $email", color = EcoColors.TextSecondary, fontSize = 11.sp)
+                Text("Actual: $currentEmail", color = EcoColors.TextSecondary, fontSize = 11.sp)
                 Spacer(modifier = Modifier.height(16.dp))
                 ModernTextField(
                     value = newEmail,
@@ -203,10 +218,12 @@ fun SettingsScreen(
                 scope.launch {
                     val success = UserRepository().updateUserPassword(newPassword)
                     if (success) {
-                        statusMessage = "✅ Contraseña actualizada"
+                        statusMessage = "✅ Contraseña actualizada correctamente"
+                        isErrorStatus = false
                         showChangePasswordDialog = false
                     } else {
-                        statusMessage = "❌ Error al actualizar contraseña"
+                        statusMessage = "❌ Error: La contraseña debe tener min. 6 caracteres"
+                        isErrorStatus = true
                     }
                 }
             }
@@ -248,10 +265,14 @@ fun SettingsScreen(
                     val success = UserRepository().updateProfileInfo(userId, newDisplayName, newBio)
                     if (success) {
                         settings.putString("username", newDisplayName)
-                        statusMessage = "✅ Perfil actualizado"
+                        currentDisplayName = newDisplayName
+                        currentBio = newBio
+                        statusMessage = "✅ Perfil actualizado correctamente"
+                        isErrorStatus = false
                         showEditProfileDialog = false
                     } else {
-                        statusMessage = "❌ Error al actualizar"
+                        statusMessage = "❌ Error al conectar con el servidor"
+                        isErrorStatus = true
                     }
                 }
             }
@@ -318,16 +339,18 @@ fun SettingsScreen(
             // Estado / feedback
             if (statusMessage.isNotEmpty()) {
                 Surface(
-                    color = EcoColors.GlassGreen.copy(alpha = 0.2f),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    color = if (isErrorStatus) EcoColors.Error.copy(alpha = 0.15f) else EcoColors.GlassGreen.copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, if (isErrorStatus) EcoColors.Error.copy(alpha = 0.3f) else EcoColors.Success.copy(alpha = 0.3f))
                 ) {
                     Text(
                         statusMessage, 
-                        color = EcoColors.Success, 
+                        color = if (isErrorStatus) EcoColors.Error else EcoColors.Success, 
                         fontSize = 13.sp, 
-                        modifier = Modifier.padding(8.dp),
-                        fontWeight = FontWeight.Medium
+                        modifier = Modifier.padding(12.dp),
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
                     )
                 }
             }
@@ -335,28 +358,37 @@ fun SettingsScreen(
             // ── Sección: Cuenta ─────────────────────────────────────────────
             SectionHeader("👤 Cuenta")
             GlassCard(modifier = Modifier.fillMaxWidth()) {
-                SettingsRow(Icons.Default.AccountCircle, Color(0xFF007AFF), "Usuario", username)
+                // Info estática
+                SettingsRow(Icons.Default.AccountCircle, Color(0xFF007AFF), "Usuario", currentDisplayName)
                 EcoDivider(modifier = Modifier.padding(vertical = 8.dp))
-                
-                InteractiveRow(Icons.Default.Edit, Color(0xFF8E8E93), "Editar Perfil") { 
+                SettingsRow(Icons.Default.Email, Color(0xFFFF9500), "Email", currentEmail)
+                EcoDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                // Acciones interactivas
+                InteractiveRow(Icons.Default.Edit, Color(0xFF8E8E93), "Editar Perfil") {
+                    newDisplayName = currentDisplayName
+                    newBio = currentBio
                     showEditProfileDialog = true
                 }
                 EcoDivider(modifier = Modifier.padding(vertical = 8.dp))
-                InteractiveRow(Icons.Default.Email, Color(0xFFFF9500), "Cambiar Email") { 
+                InteractiveRow(Icons.Default.Email, Color(0xFFFF9500), "Cambiar Email") {
+                    newEmail = ""
                     showChangeEmailDialog = true
                 }
                 EcoDivider(modifier = Modifier.padding(vertical = 8.dp))
-                InteractiveRow(Icons.Default.Lock, Color(0xFFFF3B30), "Cambiar Contraseña") { 
+                InteractiveRow(Icons.Default.Lock, Color(0xFFFF3B30), "Cambiar Contraseña") {
+                    oldPassword = ""
+                    newPassword = ""
+                    repeatNewPassword = ""
                     showChangePasswordDialog = true
                 }
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 GlassSecondaryButton(
                     onClick = {
                         scope.launch {
                             UserRepository().signOut()
-                            // Limpiar datos de sesión y puntos locales
                             settings.remove("user_id")
                             settings.remove("username")
                             settings.remove("email")
@@ -371,7 +403,7 @@ fun SettingsScreen(
                 ) {
                     Text("Cerrar Sesión")
                 }
-                
+
                 TextButton(
                     onClick = { showDeleteAccountDialog = true },
                     modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -537,7 +569,8 @@ private fun ModernDialog(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Surface(
-                        modifier = Modifier.weight(1f).height(50.dp).clickable { onDismissRequest() },
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        onClick = onDismissRequest,
                         color = EcoColors.CardPrimary.copy(alpha = 0.1f),
                         shape = RoundedCornerShape(16.dp),
                         border = androidx.compose.foundation.BorderStroke(1.dp, EcoColors.TextSecondary.copy(alpha = 0.1f))
@@ -546,9 +579,10 @@ private fun ModernDialog(
                             Text(dismissButtonText, color = EcoColors.TextSecondary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         }
                     }
-                    
+
                     Surface(
-                        modifier = Modifier.weight(1f).height(50.dp).clickable { onConfirm() },
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        onClick = onConfirm,
                         color = confirmColor,
                         shape = RoundedCornerShape(16.dp)
                     ) {
@@ -562,6 +596,7 @@ private fun ModernDialog(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ModernTextField(
     value: String,
@@ -580,7 +615,17 @@ private fun ModernTextField(
         singleLine = isSingleLine,
         visualTransformation = if (isPassword) androidx.compose.ui.text.input.PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
         shape = RoundedCornerShape(16.dp),
-        colors = TextFieldDefaults.colors()
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = EcoColors.CardPrimary,
+            unfocusedContainerColor = EcoColors.CardPrimary,
+            focusedTextColor = EcoColors.TextPrimary,
+            unfocusedTextColor = EcoColors.TextPrimary,
+            cursorColor = EcoColors.GlassAccent,
+            focusedIndicatorColor = EcoColors.GlassAccent,
+            unfocusedIndicatorColor = EcoColors.TextSecondary.copy(alpha = 0.3f),
+            focusedLabelColor = EcoColors.GlassAccent,
+            unfocusedLabelColor = EcoColors.TextSecondary
+        )
     )
 }
 
@@ -640,14 +685,23 @@ private fun InteractiveRow(
     label: String,
     onClick: () -> Unit
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically, 
-        modifier = Modifier.fillMaxWidth().clickable { onClick() }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick,
+        color = Color.Transparent,
+        shape = RoundedCornerShape(8.dp)
     ) {
-        SettingsIconBox(icon, iconColor)
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(label, color = EcoColors.TextPrimary, fontSize = 14.sp, modifier = Modifier.weight(1f))
-        Icon(Icons.Default.ChevronRight, null, tint = EcoColors.TextSecondary.copy(alpha = 0.5f), modifier = Modifier.size(20.dp))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp)
+        ) {
+            SettingsIconBox(icon, iconColor)
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(label, color = EcoColors.TextPrimary, fontSize = 14.sp, modifier = Modifier.weight(1f))
+            Icon(Icons.Default.ChevronRight, null, tint = EcoColors.TextSecondary.copy(alpha = 0.5f), modifier = Modifier.size(20.dp))
+        }
     }
 }
 

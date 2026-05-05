@@ -23,17 +23,13 @@ import com.rubensimon.ecolens.ui.components.CustomIcons
 import com.rubensimon.ecolens.ui.components.EcoColors
 import com.rubensimon.ecolens.ui.navigation.AppNavigation
 import com.russhwolf.settings.Settings
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.ui.platform.LocalDensity
 
 @Composable
 fun App(startDestination: String = "welcome") {
     // ── Gestión del Tema ──
     val isSystemDark = isSystemInDarkTheme()
     val settings = remember { Settings() }
-    val density = LocalDensity.current
-    
+
     val initialRoute = remember {
         val savedUserId = settings.getString("user_id", "")
         if (savedUserId.isNotEmpty()) "menu" else "welcome"
@@ -50,7 +46,7 @@ fun App(startDestination: String = "welcome") {
     val currentRoute = navBackStackEntry?.destination?.route
 
     val showBottomBar = currentRoute != null && currentRoute in listOf("menu", "collection", "rewards", "profile", "settings", "history", "leaderboard", "maps", "upcycling")
-    val edgeWidthPx = with(density) { 40.dp.toPx() }
+
 
     Scaffold(
         bottomBar = {
@@ -68,16 +64,6 @@ fun App(startDestination: String = "welcome") {
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .pointerInput(navController) {
-                        detectHorizontalDragGestures { change, dragAmount ->
-                            if (change.previousPosition.x < edgeWidthPx && dragAmount > 15) {
-                                if (navController.previousBackStackEntry != null) {
-                                    change.consume()
-                                    navController.popBackStack()
-                                }
-                            }
-                        }
-                    }
             ) {
                 AppNavigation(
                     navController = navController,
