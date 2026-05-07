@@ -32,6 +32,10 @@ object HistoryManager {
     private val settings: Settings by lazy { Settings() }
     private val client = SupabaseClientProvider.client
     private val scope = CoroutineScope(Dispatchers.IO)
+    
+    // Cache en memoria para la comunidad (Persistente mientras la app esté abierta)
+    var globalActivityCache: List<HistoryItem> = emptyList()
+    var avatarCache: MutableMap<String, String?> = mutableMapOf()
 
     private const val KEY_HISTORY = "lista_historial"
     private const val KEY_LAST_SYNC = "last_history_sync"

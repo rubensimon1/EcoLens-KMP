@@ -20,6 +20,8 @@ sealed class Screen(val route: String) {
     data object Collection : Screen("collection")
     data object Upcycling : Screen("upcycling")
     data object Onboarding : Screen("onboarding")
+    data object AiChat : Screen("ai_chat")
+    data object Notifications : Screen("notifications")
     
     data object FriendProfile : Screen("friend_profile/{userId}") {
         fun createRoute(userId: String) = "friend_profile/$userId"

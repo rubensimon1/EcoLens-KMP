@@ -21,6 +21,9 @@ import com.rubensimon.ecolens.ui.screens.features.MapsScreen
 import com.rubensimon.ecolens.ui.screens.features.RewardsScreen
 import com.rubensimon.ecolens.ui.screens.features.ScanScreen
 import com.rubensimon.ecolens.ui.screens.features.UpcyclingScreen
+import com.rubensimon.ecolens.ui.screens.auth.OnboardingScreen
+import com.rubensimon.ecolens.ui.screens.main.AiChatScreen
+import com.rubensimon.ecolens.ui.screens.main.NotificationsScreen
 import com.rubensimon.ecolens.ui.screens.main.MenuScreen
 import com.rubensimon.ecolens.ui.screens.main.ProfileScreen
 import com.rubensimon.ecolens.ui.screens.main.SettingsScreen
@@ -128,8 +131,15 @@ fun AppNavigation(
                 onHistoryClick = { navController.navigate(Screen.History.route) },
                 onMapsClick = { navController.navigate(Screen.Maps.route) },
                 onStatsClick = { navController.navigate(Screen.Leaderboard.route) },
-                onAiChatClick = { /* Próximamente */ },
+                onAiChatClick = { navController.navigate(Screen.AiChat.route) },
+                onNotificationsClick = { navController.navigate(Screen.Notifications.route) },
                 onAchievementsClick = { navController.navigate(Screen.Rewards.route) },
+                onFriendProfileClick = { userId ->
+                    navController.navigate(Screen.FriendProfile.createRoute(userId))
+                },
+                onLeaderboardClick = {
+                    navController.navigate(Screen.Leaderboard.route)
+                },
                 onSettingsClick = { navController.navigate(Screen.Settings.route) },
                 onEcoDexClick = { navController.navigate(Screen.Collection.route) }
             )
@@ -201,6 +211,16 @@ fun AppNavigation(
 
         composable(Screen.Upcycling.route) {
             UpcyclingScreen(onBackClick = { navController.popBackStack() })
+        }
+
+        composable(Screen.AiChat.route) {
+            // Aquí irá el AiChatScreen completo
+            AiChatScreen(onBackClick = { navController.popBackStack() })
+        }
+
+        composable(Screen.Notifications.route) {
+            // Aquí irá el NotificationsScreen completo
+            NotificationsScreen(onBackClick = { navController.popBackStack() })
         }
     }
 }
