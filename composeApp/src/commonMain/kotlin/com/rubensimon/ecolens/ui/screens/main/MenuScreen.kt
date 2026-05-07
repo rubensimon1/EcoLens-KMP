@@ -159,20 +159,49 @@ fun MenuScreen(
                     modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
                 ) {
                     // ── HEADER ORBE Y ANILLO DE NIVEL ──────────────
-                val level = calcularNivel(points)
-                val basePoints = getBaseLevelPoints(level)
-                val nextPoints = getNextLevelPoints(level)
-                val progressRatio = ((points - basePoints).toFloat() / (nextPoints - basePoints)).coerceIn(0f, 1f)
-                val animatedProgress by animateFloatAsState(targetValue = progressRatio, tween(1500))
+                // ── Lógica de Nivel con Animación de Reinicio (Tipo Juego) ──
+                val targetLevel = calcularNivel(points)
+                var displayedLevel by remember { mutableStateOf(targetLevel) }
+                val progressAnimatable = remember { androidx.compose.animation.core.Animatable(0f) }
 
+                LaunchedEffect(points) {
+                    val currentLevelInAnim = calcularNivel(points)
+                    
+                    if (currentLevelInAnim > displayedLevel) {
+                        // 1. Completar el círculo actual hasta el 100%
+                        progressAnimatable.animateTo(1f, animationSpec = tween(800, easing = LinearEasing))
+                        // 2. Cambiar nivel visual y resetear círculo a 0
+                        displayedLevel = currentLevelInAnim
+                        progressAnimatable.snapTo(0f)
+                    }
+                    
+                    // 3. Animar hasta el progreso real actual
+                    val base = getBaseLevelPoints(currentLevelInAnim)
+                    val next = getNextLevelPoints(currentLevelInAnim)
+                    val actualProgress = ((points - base).toFloat() / (next - base)).coerceIn(0f, 1f)
+                    progressAnimatable.animateTo(actualProgress, animationSpec = tween(1200, easing = FastOutSlowInEasing))
+                }
+                
+                val animatedProgress = progressAnimatable.value
+
+                // ── Lógica de Saludo Dinámico ──
+                val greeting = remember {
+                    val now = kotlinx.datetime.Clock.System.now().toLocalDateTime(kotlinx.datetime.TimeZone.currentSystemDefault()).hour
+                    when (now) {
+                        in 5..12 -> "¡Buenos días,"
+                        in 13..20 -> "¡Buenas tardes,"
+                        else -> "¡Buenas noches,"
+                    }
+                }
+                
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 24.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         // Avatar Orbe con anillo
-                        Box(modifier = Modifier.size(68.dp), contentAlignment = Alignment.Center) {
+                        Box(modifier = Modifier.size(64.dp), contentAlignment = Alignment.Center) {
                             CircularProgressIndicator(progress = { 1f }, modifier = Modifier.fillMaxSize(), color = EcoColors.CardPrimary, strokeWidth = 3.dp)
                             CircularProgressIndicator(progress = { animatedProgress }, modifier = Modifier.fillMaxSize(), color = EcoColors.GlassAccent, strokeWidth = 3.dp, strokeCap = StrokeCap.Round)
                             
@@ -182,53 +211,66 @@ fun MenuScreen(
                             
                             Box(
                                 modifier = Modifier
-                                    .size(54.dp)
+                                    .size(50.dp)
                                     .background(headerAvatarGradient, CircleShape)
                                     .border(2.dp, Color.White.copy(alpha = 0.2f), CircleShape)
-                                    .clip(CircleShape),
+                                    .clip(CircleShape)
+                                    .clickable { onProfileClick() },
                                 contentAlignment = Alignment.Center
                             ) {
-                                // Capa 1: Letra (siempre al fondo como fallback)
+                                // Capa 1: Letra al fondo
                                 Text(
                                     text = username.trim().replace("@", "").take(1).uppercase().ifEmpty { "U" },
                                     color = Color.White,
-                                    fontSize = 24.sp,
+                                    fontSize = 22.sp,
                                     fontWeight = FontWeight.Black,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.clickable { onProfileClick() }
+                                    textAlign = TextAlign.Center
                                 )
 
-                                // Capa 2: Imagen (encima si existe)
+                                // Capa 2: Imagen encima
                                 if (!isHeaderAvatarEmpty) {
                                     val avatarTimestamp = remember(currentProfilePic) { Clock.System.now().toEpochMilliseconds() }
                                     AsyncImage(
                                         model = "$currentProfilePic?t=$avatarTimestamp",
                                         contentDescription = "Perfil",
                                         contentScale = ContentScale.Crop,
-                                        modifier = Modifier.fillMaxSize().clickable { onProfileClick() }
+                                        modifier = Modifier.fillMaxSize()
                                     )
                                 }
                             }
                             
                             // Nivel flotante
                             Box(
-                                modifier = Modifier.align(Alignment.BottomEnd).offset(x = 4.dp, y = 4.dp).size(24.dp).background(EcoColors.GlassAccent, CircleShape).border(2.dp, EcoColors.BackgroundDark, CircleShape),
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .offset(x = 2.dp, y = 2.dp)
+                                    .size(20.dp)
+                                    .background(EcoColors.GlassAccent, CircleShape)
+                                    .border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("$level", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                                Text(
+                                    text = "$displayedLevel", 
+                                    color = Color.White, 
+                                    fontSize = 10.sp, 
+                                    fontWeight = FontWeight.Black
+                                )
                             }
                         }
-                        Spacer(modifier = Modifier.width(16.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
                         Column {
-                            Text("Hola, $username", color = EcoColors.TextSecondary, fontSize = 14.sp)
-                            Text("Hoy", color = EcoColors.TextPrimary, fontSize = 28.sp, fontWeight = FontWeight.Black)
+                            Text("$greeting $username!", color = EcoColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                            Text("Hoy", color = EcoColors.TextPrimary, fontSize = 22.sp, fontWeight = FontWeight.Black)
                         }
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         AnimatedLevelBadge(points, todayScansCount)
-                        Spacer(modifier = Modifier.width(12.dp))
-                        IconButton(onClick = onSettingsClick, modifier = Modifier.size(44.dp).background(EcoColors.CardPrimary.copy(alpha = 0.4f), CircleShape)) {
-                            Icon(Icons.Default.Settings, null, tint = EcoColors.TextPrimary, modifier = Modifier.size(22.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(
+                            onClick = { onSettingsClick() }, 
+                            modifier = Modifier.size(40.dp).background(EcoColors.CardPrimary.copy(alpha = 0.4f), CircleShape)
+                        ) {
+                            Icon(Icons.Default.Settings, null, tint = EcoColors.TextPrimary, modifier = Modifier.size(20.dp))
                         }
                     }
                 }
@@ -418,7 +460,13 @@ fun WeeklyCalendar(selectedDate: LocalDate, onDateSelected: (LocalDate) -> Unit)
 
 @Composable
 fun MissionCard(scans: Int) {
-    GlassCard(backgroundColor = EcoColors.GlassAccent.copy(alpha = 0.9f), cornerRadius = 50, onClick = {}) {
+    val shape = RoundedCornerShape(50.dp)
+    GlassCard(
+        modifier = Modifier.clip(shape).shimmerEffect(),
+        backgroundColor = EcoColors.GlassAccent.copy(alpha = 0.9f), 
+        cornerRadius = 50, 
+        onClick = {}
+    ) {
         Box(modifier = Modifier.fillMaxWidth().height(110.dp)) {
             // Icono translúcido gigante
             Icon(
@@ -453,7 +501,11 @@ fun MissionCard(scans: Int) {
 
 @Composable
 fun CommunityItem(item: SocialHistoryItem, avatarUrl: String?) {
-    GlassCard(modifier = Modifier.width(180.dp), cornerRadius = 24) {
+    val shape = RoundedCornerShape(24.dp)
+    GlassCard(
+        modifier = Modifier.width(180.dp).clip(shape).shimmerEffect(durationMillis = 5000), 
+        cornerRadius = 24
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val isAvatarEmpty = avatarUrl.isNullOrEmpty() || avatarUrl == "null" || avatarUrl.isBlank()
@@ -510,7 +562,11 @@ fun DailyProgressBar(scans: Int) {
         animationSpec = tween(1500, easing = FastOutSlowInEasing)
     )
     
-    GlassCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp), cornerRadius = 32) {
+    val shape = RoundedCornerShape(32.dp)
+    GlassCard(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).clip(shape).shimmerEffect(durationMillis = 4000), 
+        cornerRadius = 32
+    ) {
         Row(modifier = Modifier.padding(24.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(64.dp)) {
                 CircularProgressIndicator(
@@ -664,24 +720,24 @@ fun AnimatedLevelBadge(points: Int, todayScansCount: Int) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .background(EcoColors.CardPrimary.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
-            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .background(EcoColors.CardPrimary.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+            .padding(horizontal = 8.dp, vertical = 4.dp)
     ) {
         Box(
-            modifier = Modifier.size(24.dp).background(fireBgColor, CircleShape),
+            modifier = Modifier.size(20.dp).background(fireBgColor, CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Default.Whatshot, contentDescription = null, tint = fireColor, modifier = Modifier.size(14.dp))
+            Icon(Icons.Default.Whatshot, contentDescription = null, tint = fireColor, modifier = Modifier.size(12.dp))
         }
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(6.dp))
         
         Column(verticalArrangement = Arrangement.Center) {
-            Text("Nivel $level", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = EcoColors.TextPrimary)
+            Text("Nivel $level", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = EcoColors.TextPrimary)
             Spacer(modifier = Modifier.height(2.dp))
             Box(
                 modifier = Modifier
-                    .width(48.dp)
-                    .height(4.dp)
+                    .width(40.dp)
+                    .height(3.dp)
                     .clip(CircleShape)
                     .background(EcoColors.TextSecondary.copy(alpha = 0.2f))
             ) {

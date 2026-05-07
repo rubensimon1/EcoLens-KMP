@@ -163,20 +163,23 @@ fun ModernBottomBar(navController: NavHostController, currentRoute: String?) {
                     val selected = currentRoute == route
                     val accentColor = if (isDark) Color(0xFF76D7C4) else Color(0xFF2ECC71)
                     
-                    val animatedSize by animateDpAsState(targetValue = if (selected) 30.dp else 24.dp)
+                    // Micro-animación de escala y rebote
+                    val animatedSize by animateDpAsState(
+                        targetValue = if (selected) 30.dp else 24.dp,
+                        animationSpec = spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessLow)
+                    )
+                    val animatedYOffset by animateDpAsState(
+                        targetValue = if (selected) (-4).dp else 0.dp,
+                        animationSpec = spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessLow)
+                    )
                     val animatedColor by animateColorAsState(targetValue = if (selected) accentColor else (if (isDark) Color.White.copy(alpha = 0.4f) else Color.Black.copy(alpha = 0.3f)))
                     
                     IconButton(
                         onClick = {
                             if (!selected) {
                                 navController.navigate(route) {
-                                    // Navega a la raíz del grafo para evitar acumular pantallas
-                                    popUpTo(navController.graph.startDestinationId) {
-                                        saveState = true
-                                    }
-                                    // Evita múltiples copias de la misma pantalla
+                                    popUpTo("menu") { saveState = true }
                                     launchSingleTop = true
-                                    // Restaura el estado (scroll, etc) si ya existía
                                     restoreState = true
                                 }
                             }
@@ -187,7 +190,9 @@ fun ModernBottomBar(navController: NavHostController, currentRoute: String?) {
                             imageVector = icon,
                             contentDescription = label,
                             tint = animatedColor,
-                            modifier = Modifier.size(animatedSize)
+                            modifier = Modifier
+                                .size(animatedSize)
+                                .offset(y = animatedYOffset)
                         )
                     }
                 }
