@@ -18,11 +18,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.composed
 import androidx.compose.animation.core.*
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -146,6 +147,39 @@ object EcoColors {
             start = Offset(0f, 0f),
             end = Offset(100f, 100f)
         )
+    }
+}
+
+/**
+ * Modificador para añadir un efecto de brillo dinámico (shimmer) suave.
+ */
+fun Modifier.shimmerEffect(
+    durationMillis: Int = 3000,
+    delayMillis: Int = 1000
+): Modifier = composed {
+    val infiniteTransition = rememberInfiniteTransition()
+    val xOffset by infiniteTransition.animateFloat(
+        initialValue = -1f,
+        targetValue = 2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis, delayMillis = delayMillis, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        )
+    )
+
+    drawWithContent {
+        drawContent()
+        val brush = Brush.linearGradient(
+            colors = listOf(
+                Color.White.copy(alpha = 0f),
+                Color.White.copy(alpha = 0.12f),
+                Color.White.copy(alpha = 0f),
+            ),
+            start = Offset(size.width * xOffset, 0f),
+            end = Offset(size.width * (xOffset + 0.5f), size.height)
+        )
+        // Dibujamos el brillo usando el tamaño actual pero limitado por el clipping del modifier
+        drawRect(brush = brush)
     }
 }
 
