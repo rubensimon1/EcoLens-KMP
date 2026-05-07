@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -61,10 +62,13 @@ fun MenuScreen(
     onHistoryClick: () -> Unit,
     onMapsClick: () -> Unit,
     onStatsClick: () -> Unit,
-    onAiChatClick: () -> Unit,
     onAchievementsClick: () -> Unit,
     onSettingsClick: () -> Unit,
-    onEcoDexClick: () -> Unit
+    onEcoDexClick: () -> Unit,
+    onAiChatClick: () -> Unit,
+    onNotificationsClick: () -> Unit,
+    onFriendProfileClick: (String) -> Unit,
+    onLeaderboardClick: () -> Unit
 ) {
     var points by remember { mutableIntStateOf(0) }
     var todayScansCount by remember { mutableIntStateOf(0) }
@@ -72,9 +76,9 @@ fun MenuScreen(
     var username by remember { mutableStateOf("EcoUser") }
     var dailyScans by remember { mutableStateOf<List<SocialHistoryItem>>(emptyList()) }
     var weeklyScansCount by remember { mutableStateOf<List<Int>>(List(7) { 0 }) }
-    var globalActivity by remember { mutableStateOf<List<SocialHistoryItem>>(emptyList()) }
-    var userAvatars by remember { mutableStateOf<Map<String, String?>>(emptyMap()) }
-    var isCommunityLoading by remember { mutableStateOf(true) }
+    var globalActivity by remember { mutableStateOf(HistoryManager.globalActivityCache) }
+    var userAvatars by remember { mutableStateOf(HistoryManager.avatarCache.toMap()) }
+    var isCommunityLoading by remember { mutableStateOf(HistoryManager.globalActivityCache.isEmpty()) }
     
     val userRepo = remember { UserRepository() }
     val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
@@ -115,12 +119,19 @@ fun MenuScreen(
             // Cargar comunidad de forma asíncrona y optimizada (una sola consulta join)
             launch {
                 try {
-                    isCommunityLoading = true
+                    // Si el cache está vacío, mostramos el esqueleto de carga
+                    if (HistoryManager.globalActivityCache.isEmpty()) {
+                        isCommunityLoading = true
+                    }
+                    
                     val activitiesWithUsers = userRepo.getGlobalActivityWithProfiles(10)
                     
                     if (activitiesWithUsers.isNotEmpty()) {
-                        userAvatars = activitiesWithUsers.associate { it.second.id to it.second.profile_picture_url }
-                        globalActivity = activitiesWithUsers.map { (act, user) ->
+                        // Actualizar Cache Global
+                        val newAvatars = activitiesWithUsers.associate { it.second.id to it.second.profile_picture_url }
+                        HistoryManager.avatarCache.putAll(newAvatars)
+                        
+                        val newActivity = activitiesWithUsers.map { (act, user) ->
                             SocialHistoryItem(
                                 user_id = act.user_id,
                                 nombre = user.display_name ?: user.username,
@@ -130,15 +141,22 @@ fun MenuScreen(
                                 fecha = act.created_at ?: ""
                             )
                         }
+                        HistoryManager.globalActivityCache = newActivity
+                        
+                        // Actualizar UI
+                        userAvatars = HistoryManager.avatarCache.toMap()
+                        globalActivity = newActivity
                     }
-                    isCommunityLoading = false
                 } catch (e: Exception) { 
                     println("Error comunidad: ${e.message}")
+                } finally {
                     isCommunityLoading = false
                 }
             }
         }
     }
+
+    var hasNewNotifications by rememberSaveable { mutableStateOf(true) } // Persistente entre pantallas
 
     Scaffold(
         containerColor = Color.Transparent
@@ -265,7 +283,34 @@ fun MenuScreen(
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         AnimatedLevelBadge(points, todayScansCount)
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
+                        
+                        // Icono de Notificaciones con Badge dinámico
+                        Box {
+                            IconButton(
+                                onClick = { 
+                                    hasNewNotifications = false // Se limpian al entrar
+                                    onNotificationsClick() 
+                                }, 
+                                modifier = Modifier.size(40.dp).background(EcoColors.CardPrimary.copy(alpha = 0.4f), CircleShape)
+                            ) {
+                                Icon(Icons.Default.Notifications, null, tint = EcoColors.TextPrimary, modifier = Modifier.size(20.dp))
+                            }
+                            // Solo dibujamos el badge si hay algo nuevo
+                            if (hasNewNotifications) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .offset(x = (-2).dp, y = 2.dp)
+                                        .size(10.dp)
+                                        .background(Color(0xFFFF5252), CircleShape)
+                                        .border(1.5.dp, EcoColors.BackgroundDark, CircleShape)
+                                )
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.width(12.dp))
+                        
                         IconButton(
                             onClick = { onSettingsClick() }, 
                             modifier = Modifier.size(40.dp).background(EcoColors.CardPrimary.copy(alpha = 0.4f), CircleShape)
@@ -298,6 +343,66 @@ fun MenuScreen(
 
                         DailyProgressBar(todayScansCount)
 
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        // ── ACCESO AL ASISTENTE IA (NUEVO) ───────────────────────
+                        Box(modifier = Modifier.padding(horizontal = 24.dp)) {
+                            GlassCard(
+                                modifier = Modifier.fillMaxWidth().shimmerEffect(durationMillis = 5000),
+                                backgroundColor = EcoColors.CardPrimary.copy(alpha = 0.4f),
+                                cornerRadius = 24,
+                                onClick = onAiChatClick
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(8.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier.size(44.dp).background(EcoColors.GlassAccent.copy(alpha = 0.15f), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.AutoAwesome, null, tint = EcoColors.GlassAccent, modifier = Modifier.size(22.dp))
+                                    }
+                                    Spacer(modifier = Modifier.width(16.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("Eco-Asistente IA", fontWeight = FontWeight.Bold, color = EcoColors.TextPrimary, fontSize = 15.sp)
+                                        Text("Pregúntame cómo reciclar o ideas de upcycling", color = EcoColors.TextSecondary, fontSize = 11.sp)
+                                    }
+                                    Icon(Icons.Default.ChevronRight, null, tint = EcoColors.TextSecondary, modifier = Modifier.size(20.dp))
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        // ── ACCESO A LA COMPETICIÓN (RANKING) ───────────────────
+                        Box(modifier = Modifier.padding(horizontal = 24.dp)) {
+                            GlassCard(
+                                modifier = Modifier.fillMaxWidth(),
+                                backgroundColor = EcoColors.CardPrimary.copy(alpha = 0.4f),
+                                cornerRadius = 24,
+                                onClick = onLeaderboardClick
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(8.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier.size(44.dp).background(Color(0xFFFFD700).copy(alpha = 0.15f), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.EmojiEvents, null, tint = Color(0xFFFFD700), modifier = Modifier.size(22.dp))
+                                    }
+                                    Spacer(modifier = Modifier.width(16.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("Competición Global", fontWeight = FontWeight.Bold, color = EcoColors.TextPrimary, fontSize = 15.sp)
+                                        Text("Mira quién lidera el ranking de hoy", color = EcoColors.TextSecondary, fontSize = 11.sp)
+                                    }
+                                    Icon(Icons.Default.ChevronRight, null, tint = EcoColors.TextSecondary, modifier = Modifier.size(20.dp))
+                                }
+                            }
+                        }
+
                         Spacer(modifier = Modifier.height(24.dp))
                         StyledSectionTitle("Eco-Comunidad", Icons.Default.Groups)
                         
@@ -316,7 +421,12 @@ fun MenuScreen(
                                 horizontalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
                                 items(globalActivity) { item ->
-                                    CommunityItem(item, userAvatars[item.user_id])
+                                    CommunityItem(item, userAvatars[item.user_id]) { targetUserId ->
+                                        // Solo navegamos si es el perfil de OTRA persona
+                                        if (targetUserId != userId) {
+                                            onFriendProfileClick(targetUserId)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -500,11 +610,12 @@ fun MissionCard(scans: Int) {
 }
 
 @Composable
-fun CommunityItem(item: SocialHistoryItem, avatarUrl: String?) {
+fun CommunityItem(item: SocialHistoryItem, avatarUrl: String?, onProfileClick: (String) -> Unit) {
     val shape = RoundedCornerShape(24.dp)
     GlassCard(
         modifier = Modifier.width(180.dp).clip(shape).shimmerEffect(durationMillis = 5000), 
-        cornerRadius = 24
+        cornerRadius = 24,
+        onClick = { onProfileClick(item.user_id) }
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
