@@ -29,6 +29,7 @@ class MainActivity : ComponentActivity() {
 
         // Inicializar utilidades nativas
         com.rubensimon.ecolens.utils.PlatformAudio.setContext(this)
+        com.rubensimon.ecolens.utils.PlatformShare.setContext(this)
         com.rubensimon.ecolens.utils.NotificationHelper.setContext(this)
         com.rubensimon.ecolens.utils.NotificationHelper.createNotificationChannel(this)
 

@@ -9,7 +9,7 @@ import com.rubensimon.ecolens.utils.MadridPointsFetcherIOS
 import com.rubensimon.ecolens.data.models.maps.RecyclingPoint
 import platform.CoreLocation.CLLocationCoordinate2DMake
 import platform.MapKit.*
-import platform.UIKit.NSObject
+import platform.darwin.NSObject
 import kotlinx.cinterop.ExperimentalForeignApi
 
 @OptIn(ExperimentalForeignApi::class)

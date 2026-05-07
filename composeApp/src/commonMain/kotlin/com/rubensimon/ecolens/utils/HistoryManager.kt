@@ -87,7 +87,9 @@ object HistoryManager {
                 if (force || localItems.isEmpty() || (now - lastSync) > oneDayMs) {
                     val remoteAsLocal = remoteItems.map { remote ->
                         HistoryItem(
+                            user_id = remote.user_id,
                             nombre = remote.object_name,
+                            objeto = remote.object_name,
                             puntos = remote.points,
                             fecha = formatRemoteDate(remote.created_at),
                             emoji = getEmojiForObject(remote.object_name)
@@ -154,7 +156,9 @@ object HistoryManager {
             val parts = entry.split("|")
             if (parts.size == 3) {
                 HistoryItem(
+                    user_id = settings.getString("user_id", ""),
                     nombre = parts[0],
+                    objeto = parts[0],
                     puntos = parts[1].toIntOrNull() ?: 0,
                     fecha = parts[2],
                     emoji = getEmojiForObject(parts[0])
@@ -180,7 +184,8 @@ object HistoryManager {
     }
 
     fun clearHistory() {
-        settings.putString(KEY_HISTORY, "")
+        settings.remove(KEY_HISTORY)
+        settings.remove(KEY_LAST_SYNC)
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────

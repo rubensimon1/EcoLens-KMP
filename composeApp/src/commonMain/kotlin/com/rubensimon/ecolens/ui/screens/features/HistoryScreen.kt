@@ -1,14 +1,19 @@
 package com.rubensimon.ecolens.ui.screens.features
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -16,86 +21,96 @@ import com.rubensimon.ecolens.data.models.social.HistoryItem
 import com.rubensimon.ecolens.ui.components.*
 import com.rubensimon.ecolens.utils.HistoryManager
 
-/**
- * Historial de escaneos — migrado de HistoryActivity.
- */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(onBackClick: () -> Unit) {
     val history = remember { HistoryManager.getHistory() }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text("📜 Historial", color = EcoColors.TextPrimary, fontWeight = FontWeight.Bold)
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Atrás", tint = EcoColors.TextPrimary)
-                    }
-                },
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(Color(0xFF0F172A), Color(0xFF020617))
+                )
             )
-        },
-        containerColor = EcoColors.BackgroundDark
-    ) { padding ->
-        if (history.isEmpty()) {
-            Box(
+    ) {
+        // Brillo decorativo
+        Box(
+            modifier = Modifier
+                .size(300.dp)
+                .offset(x = (-100).dp, y = 100.dp)
+                .background(Color(0xFF3B82F6).copy(alpha = 0.05f), CircleShape)
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .safeDrawingPadding()
+        ) {
+            // Cabecera Personalizada (Sin barra blanca)
+            Row(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("♻️", fontSize = 48.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "Sin escaneos aún",
-                        color = EcoColors.TextSecondary,
-                        fontSize = 16.sp
-                    )
-                    Text(
-                        "¡Escanea tu primer objeto!",
-                        color = EcoColors.TextSecondary,
-                        fontSize = 13.sp
-                    )
+                IconButton(
+                    onClick = onBackClick,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(Color.White.copy(alpha = 0.05f), CircleShape)
+                ) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Atrás", tint = Color.White)
                 }
-            }
-        } else {
-            val groupedHistory = remember(history) {
-                history.groupBy { it.fecha.substringBefore(" ") } // Agrupar por fecha sin hora
+                Spacer(modifier = Modifier.width(20.dp))
+                Text(
+                    "Mi Historial",
+                    color = Color.White,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
             }
 
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                contentPadding = PaddingValues(vertical = 20.dp)
-            ) {
-                item {
-                    Text(
-                        "Historial de Reciclaje",
-                        color = EcoColors.TextPrimary,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                }
-
-                groupedHistory.forEach { (date, items) ->
-                    item {
+            if (history.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("♻️", fontSize = 48.sp)
+                        Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = date,
-                            color = EcoColors.GlassAccent,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(vertical = 4.dp)
+                            "Aún no has reciclado nada",
+                            color = Color.White.copy(alpha = 0.5f),
+                            fontSize = 16.sp
                         )
                     }
-                    items(items) { item ->
-                        HistoryItemCard(item)
+                }
+            } else {
+                val groupedHistory = remember(history) {
+                    history.groupBy { it.fecha.substringBefore(" ") }
+                }
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    contentPadding = PaddingValues(bottom = 32.dp)
+                ) {
+                    groupedHistory.forEach { (date, items) ->
+                        item {
+                            Text(
+                                text = date,
+                                color = Color(0xFF10B981),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+                            )
+                        }
+                        items(items) { item ->
+                            HistoryItemRowLarge(item)
+                        }
                     }
                 }
             }
@@ -104,25 +119,50 @@ fun HistoryScreen(onBackClick: () -> Unit) {
 }
 
 @Composable
-private fun HistoryItemCard(item: HistoryItem) {
-    GlassCard(modifier = Modifier.fillMaxWidth()) {
+private fun HistoryItemRowLarge(item: HistoryItem) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color.White.copy(alpha = 0.05f),
+        shape = RoundedCornerShape(24.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
+    ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.padding(20.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = item.emoji, fontSize = 28.sp, modifier = Modifier.padding(end = 12.dp))
-                Column {
-                    Text(text = item.nombre, color = EcoColors.TextPrimary, fontWeight = FontWeight.Medium)
-                    Text(text = item.fecha, color = EcoColors.TextSecondary, fontSize = 12.sp)
-                }
+            Box(
+                modifier = Modifier
+                    .size(50.dp)
+                    .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = item.emoji, fontSize = 24.sp)
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.nombre,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+                Text(
+                    text = item.fecha.substringAfter(" "),
+                    color = Color.White.copy(alpha = 0.4f),
+                    fontSize = 12.sp
+                )
             }
             Text(
-                text = "+${item.puntos} pts",
-                color = EcoColors.Success,
+                text = "+${item.puntos}",
+                color = Color(0xFF10B981),
+                fontWeight = FontWeight.Black,
+                fontSize = 18.sp
+            )
+            Text(
+                text = " pts",
+                color = Color(0xFF10B981).copy(alpha = 0.6f),
                 fontWeight = FontWeight.Bold,
-                fontSize = 14.sp
+                fontSize = 12.sp
             )
         }
     }

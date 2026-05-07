@@ -73,6 +73,7 @@ actual fun PlatformCameraView(
     var isScanning by remember { mutableStateOf(false) }
     var resultMessage by remember { mutableStateOf("") }
     var imageCapture: ImageCapture? by remember { mutableStateOf(null) }
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
 
     Box(modifier = modifier) {
         if (hasCameraPermission) {
@@ -145,6 +146,9 @@ actual fun PlatformCameraView(
                         captureAndPredictLocal(
                             imageCapture = imageCapture,
                             onResult = { label, points, message ->
+                                // Feedback háptico profesional
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                
                                 resultMessage = "✅ $label (+$points pts)\n$message"
                                 PointsManager.addPoints(points, "scan")
                                 PointsManager.incrementScans(label, points)

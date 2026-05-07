@@ -1,102 +1,137 @@
 package com.rubensimon.ecolens.ui.screens.auth
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ecolens.composeapp.generated.resources.Res
+import ecolens.composeapp.generated.resources.logo_ecolens
+import org.jetbrains.compose.resources.painterResource
 
 @Composable
-fun WelcomeScreen(onStartClick: () -> Unit) {
-    Box(
-        modifier = Modifier
+fun WelcomeScreen(
+    onStartClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val oledBlack = Color(0xFF000000) // Negro OLED puro
+    val vividTurquoise = Color(0xFF1DE9B6) // Turquesa verdoso claro y vivo
+
+    BoxWithConstraints(
+        modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF059669)) // Solid Emerald Green like in screenshot
+            .background(vividTurquoise)
     ) {
-        // Subtle decorative shapes
-        Box(
-            modifier = Modifier
-                .size(300.dp)
-                .offset(x = 150.dp, y = (-100).dp)
-                .background(Color.White.copy(alpha = 0.05f), CircleShape)
-        )
-
+        val minHeight = maxHeight
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            modifier = Modifier.fillMaxSize()
         ) {
-            Spacer(modifier = Modifier.weight(1f))
-
-            // Logo Card
-            Surface(
-                modifier = Modifier.size(140.dp),
-                color = Color.White,
-                shape = RoundedCornerShape(28.dp),
-                shadowElevation = 8.dp
+            // TOP TURQUOISE SECTION
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(minHeight * 0.45f),
+                contentAlignment = Alignment.Center
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text("🌱", fontSize = 70.sp)
+                // EcoLens Logo
+                Surface(
+                    modifier = Modifier.size(140.dp),
+                    color = Color.White.copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(36.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.4f))
+                ) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(20.dp)) {
+                        Image(
+                            painter = painterResource(Res.drawable.logo_ecolens),
+                            contentDescription = "EcoLens Logo",
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Text(
-                text = "EcoLens",
+            // BOTTOM WHITE SECTION
+            val waveHeightPx = with(LocalDensity.current) { 60.dp.toPx() }
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(),
                 color = Color.White,
-                fontSize = 44.sp,
-                fontWeight = FontWeight.ExtraBold,
-                letterSpacing = (-1.5).sp
-            )
-
-            Spacer(modifier = Modifier.weight(1.2f))
-
-            // Buttons Container
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Button(
-                    onClick = onStartClick,
-                    modifier = Modifier.fillMaxWidth().height(64.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-                    shape = RoundedCornerShape(32.dp),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
-                ) {
-                    Text(
-                        "Get Started",
-                        color = Color(0xFF059669),
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
+                shape = GenericShape { size, _ ->
+                    moveTo(0f, waveHeightPx * 0.5f)
+                    cubicTo(
+                        size.width * 0.3f, 0f,
+                        size.width * 0.7f, waveHeightPx,
+                        size.width, waveHeightPx * 0.5f
                     )
+                    lineTo(size.width, size.height)
+                    lineTo(0f, size.height)
+                    close()
                 }
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(start = 32.dp, end = 32.dp, top = 64.dp, bottom = 48.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text(
+                            text = "Welcome",
+                            fontSize = 36.sp,
+                            fontWeight = FontWeight.Black,
+                            color = oledBlack // Letra oscura y negra OLED
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Escanea. Recicla. Salva el planeta.",
+                            color = Color.Gray,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                            lineHeight = 22.sp
+                        )
+                    }
 
-                TextButton(onClick = onStartClick) {
-                    Text(
-                        "I already have an account",
-                        color = Color.White.copy(alpha = 0.8f),
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    // Continue Button
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Continue",
+                            color = Color.Gray,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(end = 16.dp)
+                        )
+                        IconButton(
+                            onClick = onStartClick,
+                            modifier = Modifier
+                                .size(56.dp)
+                                .shadow(8.dp, CircleShape, spotColor = vividTurquoise)
+                                .background(vividTurquoise, CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowForward,
+                                contentDescription = "Continue",
+                                tint = Color.White
+                            )
+                        }
+                    }
                 }
             }
         }
