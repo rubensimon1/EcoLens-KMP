@@ -91,7 +91,6 @@ object PointsManager {
         
         updateDailyStats()
         autoSync()
-        recordActionInHistory(objectName, points)
     }
 
     private fun recordActionInHistory(objectName: String, points: Int) {
@@ -258,10 +257,13 @@ object PointsManager {
 
     fun reset() {
         settings.putInt(KEY_POINTS, 0)
+        settings.putInt(KEY_TOTAL_EARNED, 0)
         settings.putInt(KEY_SCANS, 0)
         settings.putFloat(KEY_CO2, 0f)
         settings.putInt(KEY_STREAK, 0)
         settings.putInt(KEY_DAILY_SCANS, 0)
         settings.putString(KEY_LAST_SCAN_DATE, "")
+        settings.putString(KEY_USER_ID, "")
+        settings.remove("onboarding_completed") // Opcional, dependiendo de si queremos re-mostrar onboarding
     }
 }

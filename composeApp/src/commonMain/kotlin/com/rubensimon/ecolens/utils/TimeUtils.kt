@@ -33,7 +33,8 @@ fun TimeUtils.getTimeAgo(isoDate: String?): String {
             }
             daysDiff == 1 -> "Ayer"
             daysDiff == 2 -> "Antes de ayer"
-            else -> "Hace $daysDiff días"
+            daysDiff < 7 -> "Hace $daysDiff días"
+            else -> "${dateEvent.dayOfMonth} ${dateEvent.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }}"
         }
     } catch (e: Exception) {
         "Recientemente"

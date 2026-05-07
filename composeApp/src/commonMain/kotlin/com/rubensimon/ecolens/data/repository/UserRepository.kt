@@ -3,9 +3,12 @@ package com.rubensimon.ecolens.data.repository
 import com.rubensimon.ecolens.data.models.items.Coupon
 import com.rubensimon.ecolens.data.models.social.RedemptionModel
 import com.rubensimon.ecolens.data.models.social.UserModel
+import com.rubensimon.ecolens.data.models.social.HistoryItemWithUser
+import com.rubensimon.ecolens.data.models.social.HistoryItemModel
 import com.rubensimon.ecolens.data.network.SupabaseClientProvider
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.storage.storage
 import kotlinx.datetime.Clock
@@ -224,18 +227,26 @@ class UserRepository {
     suspend fun uploadProfilePicture(userId: String, imageBytes: ByteArray): String? {
         return try {
             val bucket = client.storage["profile-pics"]
-            val fileName = "$userId.jpg"
+            // Usamos un timestamp para que la URL sea siempre distinta y fuerce el refresco
+            val timestamp = Clock.System.now().toEpochMilliseconds()
+            val fileName = "${userId}_$timestamp.jpg"
+            
+            println("[UserRepository] Subiendo nueva foto: $fileName")
             bucket.upload(fileName, imageBytes) {
                 upsert = true
             }
+            
             val publicUrl = bucket.publicUrl(fileName)
-            // Guardar URL en la tabla de usuarios
+            
+            // Guardar la nueva URL en la tabla de usuarios
             client.from("usuarios").update({
                 set("profile_picture_url", publicUrl)
                 set("updated_at", currentTimestamp())
             }) {
                 filter { eq("id", userId) }
             }
+            
+            println("[UserRepository] Foto actualizada en DB: $publicUrl")
             publicUrl
         } catch (e: Exception) {
             println("[UserRepository] Error uploadProfilePicture: ${e.message}")
@@ -376,6 +387,31 @@ class UserRepository {
     }
 
     /**
+     * Obtiene la actividad global reciente junto con la información de perfil de los usuarios
+     * en una sola consulta optimizada (Join).
+     */
+    suspend fun getGlobalActivityWithProfiles(limit: Int = 10): List<Pair<com.rubensimon.ecolens.data.models.social.HistoryItemModel, UserModel>> {
+        return try {
+            // Seleccionamos campos de historial y unimos con la tabla usuarios
+            // Nota: El formato de select para joins en supabase-kt es "*, usuarios(*)"
+            val result = client.from("historial_escaneos")
+                .select(Columns.raw("*, usuarios(*)")) {
+                    order("created_at", Order.DESCENDING)
+                    limit(limit.toLong())
+                }
+            
+            // Decodificamos la respuesta. Supabase-kt permite decodificar estructuras anidadas si los modelos coinciden
+            // Si no, podemos usar la respuesta cruda y mapear manualmente
+            val data = result.decodeList<com.rubensimon.ecolens.data.models.social.HistoryItemWithUser>()
+            data.map { it.toPair() }
+        } catch (e: Exception) {
+            println("[UserRepository] ❌ Error getGlobalActivityWithProfiles: ${e.message}")
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+
+    /**
      * Obtiene el historial completo de un usuario específico.
      */
     suspend fun getUserHistory(userId: String): List<com.rubensimon.ecolens.data.models.social.HistoryItemModel> {
@@ -392,7 +428,7 @@ class UserRepository {
         }
     }
 
-    suspend fun getUsernamesMap(userIds: List<String>): Map<String, String> {
+    suspend fun getUserProfilesMap(userIds: List<String>): Map<String, Pair<String, String?>> {
         return try {
             val users = client.from("usuarios")
                 .select {
@@ -401,7 +437,7 @@ class UserRepository {
                     }
                 }
                 .decodeList<UserModel>()
-            users.associate { it.id to (it.display_name ?: it.username) }
+            users.associate { it.id to ((it.display_name ?: it.username) to it.profile_picture_url) }
         } catch (e: Exception) {
             emptyMap()
         }

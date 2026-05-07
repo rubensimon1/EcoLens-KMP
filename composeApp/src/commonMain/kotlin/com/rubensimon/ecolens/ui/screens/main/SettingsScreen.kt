@@ -389,13 +389,18 @@ fun SettingsScreen(
                     onClick = {
                         scope.launch {
                             UserRepository().signOut()
-                            settings.remove("user_id")
+                            
+                            // Limpieza profunda de datos locales
+                            PointsManager.reset()
+                            HistoryManager.clearHistory()
+                            
+                            // Limpiar otras preferencias de usuario
                             settings.remove("username")
                             settings.remove("email")
-                            settings.remove("puntos")
-                            settings.remove("total_puntos_ganados")
-                            settings.remove("total_scans")
-                            settings.remove("co2_saved_total")
+                            settings.remove("profile_pic_url")
+                            settings.remove("collection_unlocked")
+                            settings.remove("sync_done")
+                            
                             onLogoutClick()
                         }
                     },

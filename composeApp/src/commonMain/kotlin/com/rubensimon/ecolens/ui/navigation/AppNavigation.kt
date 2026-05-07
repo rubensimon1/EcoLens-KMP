@@ -14,7 +14,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.rubensimon.ecolens.ui.screens.auth.LoginScreen
-import com.rubensimon.ecolens.ui.screens.auth.WelcomeScreen
 import com.rubensimon.ecolens.ui.screens.features.CollectionScreen
 import com.rubensimon.ecolens.ui.screens.features.HistoryScreen
 import com.rubensimon.ecolens.ui.screens.features.LeaderboardScreen
@@ -55,20 +54,44 @@ fun AppNavigation(
 ) {
     NavHost(
         navController = navController,
-        startDestination = startDestination
+        startDestination = startDestination,
+        enterTransition = {
+            androidx.compose.animation.slideInHorizontally(
+                initialOffsetX = { 1000 },
+                animationSpec = androidx.compose.animation.core.tween(400)
+            ) + androidx.compose.animation.fadeIn(animationSpec = androidx.compose.animation.core.tween(400))
+        },
+        exitTransition = {
+            androidx.compose.animation.slideOutHorizontally(
+                targetOffsetX = { -1000 },
+                animationSpec = androidx.compose.animation.core.tween(400)
+            ) + androidx.compose.animation.fadeOut(animationSpec = androidx.compose.animation.core.tween(400))
+        },
+        popEnterTransition = {
+            androidx.compose.animation.slideInHorizontally(
+                initialOffsetX = { -1000 },
+                animationSpec = androidx.compose.animation.core.tween(400)
+            ) + androidx.compose.animation.fadeIn(animationSpec = androidx.compose.animation.core.tween(400))
+        },
+        popExitTransition = {
+            androidx.compose.animation.slideOutHorizontally(
+                targetOffsetX = { 1000 },
+                animationSpec = androidx.compose.animation.core.tween(400)
+            ) + androidx.compose.animation.fadeOut(animationSpec = androidx.compose.animation.core.tween(400))
+        }
     ) {
         // ── Auth ────────────────────────────────────────────────────────────
         composable(Screen.Welcome.route) {
-            val settings = remember { Settings() }
-            WelcomeScreen(
-                onStartClick = { 
-                    val completed = settings.getBoolean("onboarding_completed", false)
-                    if (completed) {
-                        navController.navigate(Screen.Login.route) 
-                    } else {
-                        navController.navigate(Screen.Onboarding.route)
+            LoginScreen(
+                onLoginSuccess = {
+                    navController.navigate(Screen.Menu.route) {
+                        popUpTo(Screen.Welcome.route) { inclusive = true }
                     }
-                }
+                },
+                onNavigateToOnboarding = {
+                    navController.navigate(Screen.Onboarding.route)
+                },
+                startInWelcome = true
             )
         }
 
@@ -88,27 +111,27 @@ fun AppNavigation(
                     navController.navigate(Screen.Menu.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
-                }
+                },
+                startInWelcome = false
             )
         }
 
         // ── Main ────────────────────────────────────────────────────────────
         composable(Screen.Menu.route) {
+            val settings = remember { Settings() }
+            val userId = remember { settings.getString("user_id", "") }
+            
             MenuScreen(
-                onScanClick = { navController.navigate(Screen.Scan.route) },
-                onHistoryClick = { navController.navigate(Screen.History.route) },
-                onLeaderboardClick = { navController.navigate(Screen.Leaderboard.route) },
-                onRewardsClick = { navController.navigate(Screen.Rewards.route) },
-                onMapsClick = { navController.navigate(Screen.Maps.route) },
-                onCollectionClick = { navController.navigate(Screen.Collection.route) },
-                onUpcyclingClick = { navController.navigate(Screen.Upcycling.route) },
+                userId = userId,
                 onProfileClick = { navController.navigate(Screen.Profile.route) },
+                onCameraClick = { navController.navigate(Screen.Scan.route) },
+                onHistoryClick = { navController.navigate(Screen.History.route) },
+                onMapsClick = { navController.navigate(Screen.Maps.route) },
+                onStatsClick = { navController.navigate(Screen.Leaderboard.route) },
+                onAiChatClick = { /* Próximamente */ },
+                onAchievementsClick = { navController.navigate(Screen.Rewards.route) },
                 onSettingsClick = { navController.navigate(Screen.Settings.route) },
-                onLogoutClick = {
-                    navController.navigate(Screen.Login.route) {
-                        popUpTo(Screen.Menu.route) { inclusive = true }
-                    }
-                }
+                onEcoDexClick = { navController.navigate(Screen.Collection.route) }
             )
         }
 
