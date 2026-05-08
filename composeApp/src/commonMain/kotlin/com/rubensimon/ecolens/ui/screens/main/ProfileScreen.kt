@@ -46,13 +46,13 @@ fun ProfileScreen(
     val currentUserId = remember { settings.getString("user_id", "") }
     val displayedUserId = userId ?: currentUserId
     
-    var username by remember { mutableStateOf("EcoUser") }
-    var puntos by remember { mutableIntStateOf(0) }
-    var totalScans by remember { mutableIntStateOf(0) }
-    var bio by remember { mutableStateOf("Eco Enthusiast") }
-    var profilePicUrl by remember { mutableStateOf<String?>(null) }
-    var personalHistory by remember { mutableStateOf<List<com.rubensimon.ecolens.data.models.social.HistoryItemModel>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
+    var username by remember { mutableStateOf(com.rubensimon.ecolens.utils.HistoryManager.getCachedUsername(displayedUserId)) }
+    var puntos by remember { mutableIntStateOf(if (isSelf) PointsManager.getPoints() else com.rubensimon.ecolens.utils.HistoryManager.getCachedPoints(displayedUserId)) }
+    var totalScans by remember { mutableIntStateOf(if (isSelf) PointsManager.getTotalScans() else com.rubensimon.ecolens.utils.HistoryManager.getCachedScans(displayedUserId)) }
+    var bio by remember { mutableStateOf(com.rubensimon.ecolens.utils.HistoryManager.getCachedBio(displayedUserId)) }
+    var profilePicUrl by remember { mutableStateOf(com.rubensimon.ecolens.utils.HistoryManager.getCachedProfilePic(displayedUserId)) }
+    var personalHistory by remember { mutableStateOf(com.rubensimon.ecolens.utils.HistoryManager.getCachedUserHistory(displayedUserId)) }
+    var isLoading by remember { mutableStateOf(personalHistory.isEmpty()) }
     var isUploading by remember { mutableStateOf(false) }
     
     val imagePicker = rememberPlatformImagePicker { bytes ->
@@ -66,18 +66,31 @@ fun ProfileScreen(
 
     LaunchedEffect(displayedUserId) {
         if (displayedUserId.isNotEmpty()) {
-            isLoading = true
+            isLoading = personalHistory.isEmpty()
             val repo = UserRepository()
-            val user = repo.getUserById(displayedUserId)
-            user?.let {
-                username = it.display_name ?: it.username
-                puntos = it.puntos
-                totalScans = it.total_scans
-                bio = it.bio ?: "Eco Enthusiast"
-                profilePicUrl = it.profile_picture_url
+            try {
+                val user = repo.getUserById(displayedUserId)
+                user?.let {
+                    username = it.display_name ?: it.username
+                    puntos = it.puntos
+                    totalScans = it.total_scans
+                    bio = it.bio ?: "Eco Enthusiast"
+                    profilePicUrl = it.profile_picture_url
+                    
+                    // Actualizar cache
+                    com.rubensimon.ecolens.utils.HistoryManager.cacheUserProfile(it)
+                }
+                
+                val history = repo.getUserHistory(displayedUserId)
+                if (history.isNotEmpty()) {
+                    personalHistory = history
+                    com.rubensimon.ecolens.utils.HistoryManager.cacheUserHistory(displayedUserId, history)
+                }
+            } catch (e: Exception) {
+                println("Error loading profile: ${e.message}")
+            } finally {
+                isLoading = false
             }
-            personalHistory = repo.getUserHistory(displayedUserId)
-            isLoading = false
         }
     }
 
@@ -146,11 +159,8 @@ fun ProfileScreen(
 
                             // Capa 2: Imagen encima
                             if (!isProfileAvatarEmpty) {
-                                val avatarTimestamp = remember(currentProfileUrl, isUploading) { 
-                                    if (!isUploading) kotlinx.datetime.Clock.System.now().toEpochMilliseconds() else 0L 
-                                }
                                 AsyncImage(
-                                    model = "$currentProfileUrl?t=$avatarTimestamp",
+                                    model = currentProfileUrl,
                                     contentDescription = "Profile Picture",
                                     modifier = Modifier.fillMaxSize(),
                                     contentScale = androidx.compose.ui.layout.ContentScale.Crop
