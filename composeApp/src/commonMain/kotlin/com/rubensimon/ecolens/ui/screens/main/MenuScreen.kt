@@ -48,6 +48,7 @@ import io.github.jan.supabase.realtime.PostgresAction.Update
 import io.github.jan.supabase.realtime.channel
 import io.github.jan.supabase.realtime.postgresChangeFlow
 import io.github.jan.supabase.realtime.realtime
+import io.github.jan.supabase.postgrest.from
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -70,10 +71,10 @@ fun MenuScreen(
     onFriendProfileClick: (String) -> Unit,
     onLeaderboardClick: () -> Unit
 ) {
-    var points by remember { mutableIntStateOf(0) }
+    var points by remember { mutableIntStateOf(PointsManager.getPoints()) }
     var todayScansCount by remember { mutableIntStateOf(0) }
-    var profilePicUrl by remember { mutableStateOf<String?>(null) }
-    var username by remember { mutableStateOf("EcoUser") }
+    var profilePicUrl by remember { mutableStateOf(HistoryManager.getCachedProfilePic(userId)) }
+    var username by remember { mutableStateOf(HistoryManager.getCachedUsername(userId)) }
     var dailyScans by remember { mutableStateOf<List<SocialHistoryItem>>(emptyList()) }
     var weeklyScansCount by remember { mutableStateOf<List<Int>>(List(7) { 0 }) }
     var globalActivity by remember { mutableStateOf(HistoryManager.globalActivityCache) }
@@ -81,21 +82,15 @@ fun MenuScreen(
     var isCommunityLoading by remember { mutableStateOf(HistoryManager.globalActivityCache.isEmpty()) }
     
     val userRepo = remember { UserRepository() }
+    val scope = rememberCoroutineScope()
     val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
     var selectedDate by remember { mutableStateOf(today) }
 
     LaunchedEffect(userId) {
         if (userId.isNotEmpty()) {
             val refreshData: suspend () -> Unit = {
-                PointsManager.loadFromSupabase(userId)
-                HistoryManager.loadFromDatabase(userId)
+                // 1. Cargar datos locales INMEDIATAMENTE para respuesta instantánea
                 points = PointsManager.getPoints()
-                val user = userRepo.getUserById(userId)
-                if (user != null) {
-                    profilePicUrl = user.profile_picture_url
-                    username = user.display_name ?: user.username
-                }
-                
                 val itemsToday = HistoryManager.getHistoryForDate(today.dayOfMonth, today.monthNumber)
                 todayScansCount = itemsToday.size
                 dailyScans = HistoryManager.getHistoryForDate(selectedDate.dayOfMonth, selectedDate.monthNumber)
@@ -105,10 +100,43 @@ fun MenuScreen(
                     val d = startOfWeek.plus(offset, DateTimeUnit.DAY)
                     HistoryManager.getHistoryForDate(d.dayOfMonth, d.monthNumber).size
                 }
+
+                // 2. Intentar sincronización con red en background
+                try {
+                    PointsManager.loadFromSupabase(userId)
+                    HistoryManager.loadFromDatabase(userId)
+                    
+                    // 3. Actualizar UI con datos remotos si hubo cambios
+                    points = PointsManager.getPoints()
+                    val user = userRepo.getUserById(userId)
+                    if (user != null) {
+                        profilePicUrl = user.profile_picture_url
+                        username = user.display_name ?: user.username
+                        HistoryManager.cacheUserProfile(user)
+                    }
+                    
+                    val itemsUpdated = HistoryManager.getHistoryForDate(today.dayOfMonth, today.monthNumber)
+                    todayScansCount = itemsUpdated.size
+                    dailyScans = HistoryManager.getHistoryForDate(selectedDate.dayOfMonth, selectedDate.monthNumber)
+                    
+                    weeklyScansCount = (0..6).map { offset ->
+                        val d = startOfWeek.plus(offset, DateTimeUnit.DAY)
+                        HistoryManager.getHistoryForDate(d.dayOfMonth, d.monthNumber).size
+                    }
+                } catch (e: Exception) {
+                    println("Error refreshData (Offline): ${e.message}")
+                }
             }
             
-            // Cargar datos principales de usuario
+            // Cargar datos al iniciar
             launch { refreshData() }
+            
+            // Detector de retorno a la pantalla (OnResume equivalente en KMP)
+            // Esto asegura que al volver de Escanear, el gráfico se actualice.
+            launch {
+                SupabaseClientProvider.client.realtime.connect() // Asegurar conexión
+                // También podemos disparar refreshData periódicamente o al detectar foco
+            }
 
             // Suscripción a cambios en tiempo real
             val channel = SupabaseClientProvider.client.realtime.channel("menu-sync")
@@ -157,6 +185,53 @@ fun MenuScreen(
     }
 
     var hasNewNotifications by rememberSaveable { mutableStateOf(true) } // Persistente entre pantallas
+
+    var isOnline by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        // Detector de conexión simple: intentamos refrescar cada 5 segundos
+        while(true) {
+            val wasOffline = !isOnline
+            try {
+                // Un ping rápido a Supabase para verificar conexión real
+                SupabaseClientProvider.client.from("usuarios").select {
+                    limit(1)
+                }
+                isOnline = true
+                // Si acabamos de recuperar la conexión, sincronizamos pendientes
+                if (wasOffline) {
+                    HistoryManager.syncPendingItems()
+                }
+            } catch (e: Exception) {
+                isOnline = false
+            }
+            kotlinx.coroutines.delay(5000)
+        }
+    }
+
+    // ── Refresco automático al volver a la pantalla ──
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                scope.launch {
+                    // Refrescar solo localmente para rapidez
+                    points = PointsManager.getPoints()
+                    val itemsToday = HistoryManager.getHistoryForDate(today.dayOfMonth, today.monthNumber)
+                    todayScansCount = itemsToday.size
+                    dailyScans = HistoryManager.getHistoryForDate(selectedDate.dayOfMonth, selectedDate.monthNumber)
+                    
+                    val startOfWeek = today.minus(today.dayOfWeek.ordinal, DateTimeUnit.DAY)
+                    weeklyScansCount = (0..6).map { offset ->
+                        val d = startOfWeek.plus(offset, DateTimeUnit.DAY)
+                        HistoryManager.getHistoryForDate(d.dayOfMonth, d.monthNumber).size
+                    }
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     Scaffold(
         containerColor = Color.Transparent
@@ -247,9 +322,8 @@ fun MenuScreen(
 
                                 // Capa 2: Imagen encima
                                 if (!isHeaderAvatarEmpty) {
-                                    val avatarTimestamp = remember(currentProfilePic) { Clock.System.now().toEpochMilliseconds() }
                                     AsyncImage(
-                                        model = "$currentProfilePic?t=$avatarTimestamp",
+                                        model = currentProfilePic,
                                         contentDescription = "Perfil",
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier.fillMaxSize()
@@ -504,10 +578,33 @@ fun MenuScreen(
 
             // Espacio para la ModernBottomBar de App.kt
             Spacer(modifier = Modifier.height(140.dp))
+        }
+
+        // ── BANNER SIN CONEXIÓN (NUEVO) ──────────────────────────
+        AnimatedVisibility(
+            visible = !isOnline,
+            enter = slideInVertically { -it },
+            exit = slideOutVertically { -it },
+            modifier = Modifier.align(Alignment.TopCenter).padding(top = 12.dp)
+        ) {
+            GlassCard(
+                backgroundColor = Color(0xFFFF5252).copy(alpha = 0.9f),
+                cornerRadius = 50,
+                modifier = Modifier.padding(horizontal = 24.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.CloudOff, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Sin conexión - Modo Offline activo", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
     }
+}
+}
 }
 
 // ── COMPONENTES ESPECÍFICOS DEL MENÚ ────────────────────────────────────
@@ -642,9 +739,8 @@ fun CommunityItem(item: SocialHistoryItem, avatarUrl: String?, onProfileClick: (
 
                     // Capa 2: Imagen encima
                     if (!isAvatarEmpty) {
-                        val sessionTimestamp = remember { Clock.System.now().toEpochMilliseconds() }
                         AsyncImage(
-                            model = "$avatarUrl?t=$sessionTimestamp",
+                            model = avatarUrl,
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize()

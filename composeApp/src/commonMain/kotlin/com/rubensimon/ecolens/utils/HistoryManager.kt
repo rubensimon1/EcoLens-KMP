@@ -39,6 +39,18 @@ object HistoryManager {
 
     private const val KEY_HISTORY = "lista_historial"
     private const val KEY_LAST_SYNC = "last_history_sync"
+    private const val KEY_PENDING_SYNC = "pending_history_sync"
+    private const val KEY_PENDING_PROFILE_SYNC = "pending_profile_sync" // Formato: "type|value"
+    
+    // Claves para perfil persistente (Se añadirán prefijos de userId)
+    private const val PREFIX_USERNAME = "cached_username_"
+    private const val PREFIX_PROFILE_PIC = "cached_profile_pic_"
+    private const val PREFIX_POINTS = "cached_points_"
+    private const val PREFIX_SCANS = "cached_scans_"
+    private const val PREFIX_BIO = "cached_bio_"
+    private const val PREFIX_USER_HISTORY = "cached_user_history_"
+
+
 
     // ── Método principal ───────────────────────────────────────────────────
 
@@ -56,7 +68,11 @@ object HistoryManager {
 
         if (userId.isNotEmpty()) {
             scope.launch {
-                addRemoteHistoryItem(userId, objectName, points, actionType, co2Impact)
+                val success = addRemoteHistoryItem(userId, objectName, points, actionType, co2Impact)
+                if (!success) {
+                    // Si falla el envío (offline), lo guardamos en pendientes
+                    savePendingItem(userId, objectName, points, actionType, co2Impact)
+                }
             }
         }
     }
@@ -65,6 +81,12 @@ object HistoryManager {
      * Retorna el historial local ya procesado para la UI.
      */
     fun getHistory(): List<HistoryItem> = getLocalHistory()
+
+    fun getCachedUsername(userId: String): String = settings.getString(PREFIX_USERNAME + userId, "EcoUser")
+    fun getCachedProfilePic(userId: String): String? = settings.getStringOrNull(PREFIX_PROFILE_PIC + userId)
+    fun getCachedPoints(userId: String): Int = settings.getInt(PREFIX_POINTS + userId, 0)
+    fun getCachedScans(userId: String): Int = settings.getInt(PREFIX_SCANS + userId, 0)
+    fun getCachedBio(userId: String): String = settings.getString(PREFIX_BIO + userId, "Eco Enthusiast")
 
     /**
      * Retorna el historial filtrado por una fecha específica (formato dd/MM).
@@ -130,14 +152,73 @@ object HistoryManager {
         settings.putString(KEY_HISTORY, updated)
     }
 
+    /**
+     * Guarda un cambio de perfil para sincronizar después.
+     */
+    fun updateProfileOffline(userId: String, type: String, value: String) {
+        // Guardar localmente para efecto inmediato en la UI
+        if (type == "username") settings.putString(PREFIX_USERNAME + userId, value)
+        if (type == "avatar") settings.putString(PREFIX_PROFILE_PIC + userId, value)
+        if (type == "bio") settings.putString(PREFIX_BIO + userId, value)
+        
+        // Añadir a la cola de sincronización (aquí sí incluimos el userId en el valor)
+        val prev = settings.getString(KEY_PENDING_PROFILE_SYNC, "")
+        val entry = "$userId|$type|$value"
+        val updated = if (prev.isEmpty()) entry else "$entry;$prev"
+        settings.putString(KEY_PENDING_PROFILE_SYNC, updated)
+    }
+
+    /**
+     * Cachea el perfil completo de un usuario.
+     */
+    fun cacheUserProfile(user: com.rubensimon.ecolens.data.models.social.UserModel) {
+        settings.putString(PREFIX_USERNAME + user.id, user.display_name ?: user.username)
+        settings.putString(PREFIX_PROFILE_PIC + user.id, user.profile_picture_url ?: "")
+        settings.putInt(PREFIX_POINTS + user.id, user.puntos)
+        settings.putInt(PREFIX_SCANS + user.id, user.total_scans)
+        settings.putString(PREFIX_BIO + user.id, user.bio ?: "Eco Enthusiast")
+    }
+
+    /**
+     * Cachea el historial de un usuario específico.
+     */
+    fun cacheUserHistory(userId: String, items: List<com.rubensimon.ecolens.data.models.social.HistoryItemModel>) {
+        // Guardamos solo los últimos 10 para no saturar settings
+        val top = items.take(10)
+        val str = top.joinToString(";") { 
+            "${it.object_name}|${it.points}|${it.created_at ?: ""}"
+        }
+        settings.putString(PREFIX_USER_HISTORY + userId, str)
+    }
+
+    /**
+     * Recupera el historial cacheado de un usuario.
+     */
+    fun getCachedUserHistory(userId: String): List<com.rubensimon.ecolens.data.models.social.HistoryItemModel> {
+        val raw = settings.getString(PREFIX_USER_HISTORY + userId, "")
+        if (raw.isEmpty()) return emptyList()
+        return raw.split(";").mapNotNull { entry ->
+            val parts = entry.split("|")
+            if (parts.size == 3) {
+                com.rubensimon.ecolens.data.models.social.HistoryItemModel(
+                    user_id = userId,
+                    object_name = parts[0],
+                    points = parts[1].toIntOrNull() ?: 0,
+                    created_at = parts[2],
+                    action_type = "scan"
+                )
+            } else null
+        }
+    }
+
     private suspend fun addRemoteHistoryItem(
         userId: String,
         objectName: String,
         points: Int,
         actionType: String,
         co2Impact: Float
-    ) {
-        try {
+    ): Boolean {
+        return try {
             val historyItem = HistoryItemModel(
                 user_id = userId,
                 object_name = objectName,
@@ -148,8 +229,90 @@ object HistoryManager {
             )
             client.from("historial_escaneos").insert(historyItem)
             println("[HistoryManager] ✅ Saved remote: $objectName")
+            true
         } catch (e: Exception) {
-            println("[HistoryManager] ❌ Error addRemoteHistoryItem: ${e.message}")
+            println("[HistoryManager] ❌ Error addRemoteHistoryItem (Offline?): ${e.message}")
+            false
+        }
+    }
+
+    private fun savePendingItem(userId: String, name: String, pts: Int, type: String, co2: Float) {
+        val prev = settings.getString(KEY_PENDING_SYNC, "")
+        val entry = "$userId|$name|$pts|$type|$co2"
+        val updated = if (prev.isEmpty()) entry else "$entry;$prev"
+        settings.putString(KEY_PENDING_SYNC, updated)
+    }
+
+    /**
+     * Intenta sincronizar los items pendientes cuando vuelve la conexión.
+     */
+    fun syncPendingItems() {
+        val raw = settings.getString(KEY_PENDING_SYNC, "")
+        if (raw.isEmpty()) return
+
+        scope.launch {
+            val items = raw.split(";")
+            val remaining = mutableListOf<String>()
+
+            items.forEach { entry ->
+                val parts = entry.split("|")
+                if (parts.size == 5) {
+                    val success = addRemoteHistoryItem(
+                        userId = parts[0],
+                        objectName = parts[1],
+                        points = parts[2].toIntOrNull() ?: 0,
+                        actionType = parts[3],
+                        co2Impact = parts[4].toFloatOrNull() ?: 0.5f
+                    )
+                    if (!success) remaining.add(entry)
+                }
+            }
+
+            if (remaining.isEmpty()) {
+                settings.remove(KEY_PENDING_SYNC)
+                println("[HistoryManager] 🔄 All pending items synced!")
+            } else {
+                settings.putString(KEY_PENDING_SYNC, remaining.joinToString(";"))
+            }
+
+            // --- Sincronizar cambios de perfil pendientes ---
+            val rawProfile = settings.getString(KEY_PENDING_PROFILE_SYNC, "")
+            if (rawProfile.isNotEmpty()) {
+                val profileItems = rawProfile.split(";")
+                val profileRemaining = mutableListOf<String>()
+                val userId = settings.getString("user_id", "")
+
+                if (userId.isNotEmpty()) {
+                    profileItems.forEach { entry ->
+                        val parts = entry.split("|")
+                        if (parts.size == 3) {
+                            val targetId = parts[0]
+                            val type = parts[1]
+                            val value = parts[2]
+                            val success = try {
+                                if (type == "username") {
+                                    client.from("usuarios").update({
+                                        set("display_name", value)
+                                    }) { filter { eq("id", targetId) } }
+                                } else if (type == "avatar") {
+                                    client.from("usuarios").update({
+                                        set("profile_picture_url", value)
+                                    }) { filter { eq("id", targetId) } }
+                                }
+                                true
+                            } catch (e: Exception) { false }
+                            
+                            if (!success) profileRemaining.add(entry)
+                        }
+                    }
+                }
+
+                if (profileRemaining.isEmpty()) {
+                    settings.remove(KEY_PENDING_PROFILE_SYNC)
+                } else {
+                    settings.putString(KEY_PENDING_PROFILE_SYNC, profileRemaining.joinToString(";"))
+                }
+            }
         }
     }
 

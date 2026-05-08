@@ -265,6 +265,10 @@ fun SettingsScreen(
                     val success = UserRepository().updateProfileInfo(userId, newDisplayName, newBio)
                     if (success) {
                         settings.putString("username", newDisplayName)
+                        // Sincronizar con cache de HistoryManager para consistencia entre pantallas
+                        HistoryManager.updateProfileOffline(userId, "username", newDisplayName)
+                        HistoryManager.updateProfileOffline(userId, "bio", newBio)
+                        
                         currentDisplayName = newDisplayName
                         currentBio = newBio
                         statusMessage = "✅ Perfil actualizado correctamente"
