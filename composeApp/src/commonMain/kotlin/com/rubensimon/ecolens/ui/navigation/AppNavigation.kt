@@ -1,6 +1,7 @@
 package com.rubensimon.ecolens.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -123,8 +124,13 @@ fun AppNavigation(
         // ── Main ────────────────────────────────────────────────────────────
         composable(Screen.Menu.route) {
             val settings = remember { Settings() }
-            val userId = remember { settings.getString("user_id", "") }
+            val userId = settings.getString("user_id", "")
             
+            // Cargar notificaciones específicas de este usuario al entrar
+            LaunchedEffect(userId) {
+                com.rubensimon.ecolens.utils.NotificationManager.setUser(userId)
+            }
+
             MenuScreen(
                 userId = userId,
                 onProfileClick = { navController.navigate(Screen.Profile.route) },
@@ -183,6 +189,7 @@ fun AppNavigation(
             SettingsScreen(
                 onBackClick = { navController.popBackStack() },
                 onLogoutClick = {
+                    com.rubensimon.ecolens.utils.NotificationManager.clearForLogout()
                     navController.navigate(Screen.Login.route) {
                         popUpTo(0) { inclusive = true }
                     }
