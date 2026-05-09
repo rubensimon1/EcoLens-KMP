@@ -50,6 +50,13 @@ object HistoryManager {
     private const val PREFIX_BIO = "cached_bio_"
     private const val PREFIX_USER_HISTORY = "cached_user_history_"
 
+    private var currentUserId: String = ""
+
+    fun setUserId(userId: String) {
+        currentUserId = userId
+        println("[HistoryManager] 👤 Usuario activo: $userId")
+    }
+
 
 
     // ── Método principal ───────────────────────────────────────────────────
@@ -92,52 +99,49 @@ object HistoryManager {
      * Retorna el historial filtrado por una fecha específica (formato dd/MM).
      */
     fun getHistoryForDate(day: Int, month: Int): List<HistoryItem> {
-        val search = "${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}"
-        return getLocalHistory().filter { it.fecha.startsWith(search) }
+        val d = day.toString().padStart(2, '0')
+        val m = month.toString().padStart(2, '0')
+        val search1 = "$d/$m"       // Formato con ceros: 09/05
+        val search2 = "$day/$month" // Formato sin ceros: 9/5
+        
+        return getLocalHistory().filter { 
+            it.fecha.startsWith(search1) || it.fecha.startsWith(search2)
+        }
     }
 
     /**
      * Carga el historial desde Supabase y lo almacena localmente si es nuevo.
      */
-    suspend fun loadFromDatabase(userId: String, force: Boolean = false): Boolean {
+    suspend fun loadFromDatabase(userId: String, force: Boolean = true): Boolean {
         return try {
             if (userId.isEmpty()) return false
-
+            
+            println("[HistoryManager] ☁️ Sincronizando historial para $userId (force=$force)...")
             val remoteItems = getRemoteHistoryItems(userId)
-            val lastSync = settings.getLong(KEY_LAST_SYNC, 0L)
-            val localItems = getLocalHistory()
-            val oneDayMs = 24 * 60 * 60 * 1000L
+            val syncKey = KEY_LAST_SYNC + "_" + userId
+            val lastSync = settings.getLong(syncKey, 0L)
             val now = com.rubensimon.ecolens.utils.TimeUtils.getCurrentTimestamp()
 
             if (remoteItems.isNotEmpty()) {
-                if (force || localItems.isEmpty() || (now - lastSync) > oneDayMs) {
-                    val remoteAsLocal = remoteItems.map { remote ->
-                        HistoryItem(
-                            user_id = remote.user_id,
-                            nombre = remote.object_name,
-                            objeto = remote.object_name,
-                            puntos = remote.points,
-                            fecha = formatRemoteDate(remote.created_at),
-                            emoji = getEmojiForObject(remote.object_name)
-                        )
-                    }
-                    // Fusionar: mantener items locales recientes que aún no estén en remoto
-                    val remoteKeys = remoteAsLocal.map { "${it.nombre}|${it.fecha}" }.toSet()
-                    val localOnly = localItems.filter { "${it.nombre}|${it.fecha}" !in remoteKeys }
-                    val merged = (localOnly + remoteAsLocal).sortedByDescending { it.fecha }
-                    
-                    saveLocalHistory(merged)
-                    settings.putLong(KEY_LAST_SYNC, now)
-                    println("[HistoryManager] Merged: ${localOnly.size} local-only + ${remoteAsLocal.size} remote = ${merged.size} total (force=$force)")
-                    true
-                } else {
-                    false
+                // Si forzamos, o no hay nada local, o ha pasado tiempo...
+                val remoteAsLocal = remoteItems.map { remote ->
+                    HistoryItem(
+                        user_id = remote.user_id,
+                        nombre = remote.object_name,
+                        objeto = remote.object_name,
+                        puntos = remote.points,
+                        fecha = formatRemoteDate(remote.created_at),
+                        emoji = getEmojiForObject(remote.object_name)
+                    )
                 }
-            } else {
-                false
+                saveLocalHistory(remoteAsLocal)
+                settings.putLong(syncKey, now)
+                println("[HistoryManager] ✅ Sincronizados ${remoteAsLocal.size} elementos de Supabase.")
+                return true
             }
+            false
         } catch (e: Exception) {
-            println("[HistoryManager] Error loadFromDatabase: ${e.message}")
+            println("[HistoryManager] ❌ Error en sync: ${e.message}")
             false
         }
     }
@@ -145,11 +149,14 @@ object HistoryManager {
     // ── Privados ───────────────────────────────────────────────────────────
 
     private fun addLocalHistoryItem(objectName: String, points: Int) {
-        val prev = settings.getString(KEY_HISTORY, "")
+        val userId = if (currentUserId.isNotEmpty()) currentUserId else settings.getString("user_id", "")
+        if (userId.isEmpty()) return
+        
+        val prev = settings.getString(PREFIX_USER_HISTORY + userId, "")
         val fecha = simpleDate()
         val entry = "$objectName|$points|$fecha"
         val updated = if (prev.isEmpty()) entry else "$entry;$prev"
-        settings.putString(KEY_HISTORY, updated)
+        settings.putString(PREFIX_USER_HISTORY + userId, updated)
     }
 
     /**
@@ -317,13 +324,16 @@ object HistoryManager {
     }
 
     private fun getLocalHistory(): List<HistoryItem> {
-        val raw = settings.getString(KEY_HISTORY, "")
+        val userId = if (currentUserId.isNotEmpty()) currentUserId else settings.getString("user_id", "")
+        if (userId.isEmpty()) return emptyList()
+        
+        val raw = settings.getString(PREFIX_USER_HISTORY + userId, "")
         if (raw.isEmpty()) return emptyList()
         return raw.split(";").mapNotNull { entry ->
             val parts = entry.split("|")
-            if (parts.size == 3) {
+            if (parts.size >= 3) {
                 HistoryItem(
-                    user_id = settings.getString("user_id", ""),
+                    user_id = userId,
                     nombre = parts[0],
                     objeto = parts[0],
                     puntos = parts[1].toIntOrNull() ?: 0,
@@ -346,12 +356,18 @@ object HistoryManager {
     }
 
     private fun saveLocalHistory(items: List<HistoryItem>) {
+        val userId = if (currentUserId.isNotEmpty()) currentUserId else settings.getString("user_id", "")
+        if (userId.isEmpty()) return
+        
         val str = items.joinToString(";") { "${it.nombre}|${it.puntos}|${it.fecha}" }
-        settings.putString(KEY_HISTORY, str)
+        settings.putString(PREFIX_USER_HISTORY + userId, str)
     }
 
     fun clearHistory() {
-        settings.remove(KEY_HISTORY)
+        val userId = if (currentUserId.isNotEmpty()) currentUserId else settings.getString("user_id", "")
+        if (userId.isNotEmpty()) {
+            settings.remove(PREFIX_USER_HISTORY + userId)
+        }
         settings.remove(KEY_LAST_SYNC)
     }
 

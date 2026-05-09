@@ -216,6 +216,31 @@ class UserRepository {
         }
     }
 
+    suspend fun validateRedemption(redemptionId: String?, userId: String, cuponId: String, fechaCanje: String): Boolean {
+        return try {
+            client.from("cupones_canjeados")
+                .update({
+                    set("estado", "usado")
+                    set("fecha_uso", com.rubensimon.ecolens.utils.TimeUtils.getCurrentIsoDate())
+                }) {
+                    filter { 
+                        if (redemptionId != null) {
+                            eq("id", redemptionId)
+                        } else {
+                            eq("user_id", userId)
+                            eq("cupon_id", cuponId)
+                            eq("fecha_canje", fechaCanje)
+                        }
+                    }
+                }
+            println("[UserRepository] ✅ Cupón validado (ID: $redemptionId)")
+            true
+        } catch (e: Exception) {
+            println("[UserRepository] ❌ Error validateRedemption: ${e.message}")
+            false
+        }
+    }
+
     // ── Upload de foto de perfil ─────────────────────────────────────────────
 
     /**
@@ -338,7 +363,7 @@ class UserRepository {
             client.from("cupones_canjeados")
                 .select {
                     filter { eq("user_id", userId) }
-                    order("created_at", Order.DESCENDING)
+                    order("fecha_canje", Order.DESCENDING)
                 }
                 .decodeList<RedemptionModel>()
         } catch (e: Exception) {
@@ -354,8 +379,8 @@ class UserRepository {
                 .select {
                     filter { 
                         eq("user_id", userId) 
-                        gte("created_at", "${isoDate}T00:00:00")
-                        lte("created_at", "${isoDate}T23:59:59")
+                        gte("fecha_canje", "${isoDate}T00:00:00")
+                        lte("fecha_canje", "${isoDate}T23:59:59")
                     }
                 }
                 .decodeList<RedemptionModel>()

@@ -15,29 +15,46 @@ actual fun PlatformQRCodeView(
     content: String,
     modifier: Modifier
 ) {
-    Box(modifier = modifier) {
-        UIKitView(
-            factory = {
-                val imageView = UIImageView()
-                imageView.contentMode = UIViewContentMode.UIViewContentModeScaleAspectFit
+    UIKitView(
+        factory = {
+            UIImageView().apply {
+                contentMode = UIViewContentMode.UIViewContentModeScaleAspectFit
+                backgroundColor = UIColor.whiteColor
+                clipsToBounds = true
+            }
+        },
+        modifier = modifier,
+        update = { imageView ->
+            val data = (content as? NSString)?.dataUsingEncoding(NSUTF8StringEncoding)
+            if (data != null) {
+                val qrFilter = CIFilter.filterWithName("CIQRCodeGenerator")
+                qrFilter?.setDefaults()
+                qrFilter?.setValue(data, forKey = "inputMessage")
+                qrFilter?.setValue("M", forKey = "inputCorrectionLevel")
                 
-                val data = (content as NSString).dataUsingEncoding(NSUTF8StringEncoding)
-                if (data != null) {
-                    val filter = CIFilter.filterWithName("CIQRCodeGenerator")
-                    filter?.setValue(data, forKey = "inputMessage")
-                    filter?.setValue("Q", forKey = "inputCorrectionLevel")
+                val qrImage = qrFilter?.outputImage
+                if (qrImage != null) {
+                    val colorFilter = CIFilter.filterWithName("CIFalseColor")
+                    colorFilter?.setDefaults()
+                    colorFilter?.setValue(qrImage, forKey = "inputImage")
+                    colorFilter?.setValue(CIColor.blackColor(), forKey = "inputColor0")
+                    colorFilter?.setValue(CIColor.whiteColor(), forKey = "inputColor1")
                     
-                    val outputImage = filter?.outputImage
+                    val outputImage = colorFilter?.outputImage
                     if (outputImage != null) {
-                        val transform = platform.CoreGraphics.CGAffineTransformMakeScale(10.0, 10.0)
-                        val scaledImage = outputImage.imageByApplyingTransform(transform)
-                        val uiImage = UIImage.imageWithCIImage(scaledImage)
-                        imageView.image = uiImage
+                        val scale = 20.0
+                        val transformedImage = outputImage.imageByApplyingTransform(
+                            platform.CoreGraphics.CGAffineTransformMakeScale(scale, scale)
+                        )
+                        
+                        val context = CIContext.contextWithOptions(null)
+                        val cgImage = context.createCGImage(transformedImage, transformedImage.extent)
+                        if (cgImage != null) {
+                            imageView.image = UIImage.imageWithCGImage(cgImage)
+                        }
                     }
                 }
-                imageView
-            },
-            modifier = modifier
-        )
-    }
+            }
+        }
+    )
 }

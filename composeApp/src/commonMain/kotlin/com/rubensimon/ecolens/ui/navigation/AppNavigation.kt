@@ -126,9 +126,11 @@ fun AppNavigation(
             val settings = remember { Settings() }
             val userId = settings.getString("user_id", "")
             
-            // Cargar notificaciones específicas de este usuario al entrar
+            // Cargar datos específicos de este usuario al entrar
             LaunchedEffect(userId) {
                 com.rubensimon.ecolens.utils.NotificationManager.setUser(userId)
+                com.rubensimon.ecolens.utils.SddrManager.setUser(userId)
+                com.rubensimon.ecolens.utils.HistoryManager.setUserId(userId)
             }
 
             MenuScreen(

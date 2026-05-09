@@ -28,5 +28,9 @@ data class Coupon(
     @SerialName("dias_validez") val daysValidity: Int = 0,
     val category: String = "",
     val activo: Boolean = true,
-    @SerialName("created_at") val createdAt: String? = null
+    @SerialName("created_at") val createdAt: String? = null,
+    
+    // Campos temporales para la UI (no se guardan en la tabla de cupones_tienda)
+    @kotlinx.serialization.Transient val redemptionId: String? = null,
+    @kotlinx.serialization.Transient val status: String = "activo"
 )

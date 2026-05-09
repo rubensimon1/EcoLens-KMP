@@ -34,6 +34,7 @@ object SddrManager {
     private val settings: Settings by lazy { Settings() }
     private val client = SupabaseClientProvider.client
     private val scope = CoroutineScope(Dispatchers.IO)
+    private var syncJob: kotlinx.coroutines.Job? = null
 
     private const val KEY_SDDR_BALANCE = "sddr_balance"
     private const val KEY_SDDR_TOTAL_RECOVERED = "sddr_total_recovered"
@@ -53,23 +54,52 @@ object SddrManager {
     private val _history = MutableStateFlow<List<SddrHistoryItem>>(emptyList())
     val history: StateFlow<List<SddrHistoryItem>> = _history.asStateFlow()
 
+    fun setUser(userId: String) {
+        if (userId.isEmpty()) return
+        
+        // Limpieza inmediata de RAM para evitar ver datos del usuario anterior
+        _balance.value = 0f
+        _totalRecovered.value = 0f
+        _containersCount.value = 0
+        _history.value = emptyList()
+        
+        // Cargar datos del nuevo usuario
+        _balance.value = settings.getFloat(KEY_SDDR_BALANCE + "_" + userId, 0f)
+        _totalRecovered.value = settings.getFloat(KEY_SDDR_TOTAL_RECOVERED + "_" + userId, 0f)
+        _containersCount.value = settings.getInt(KEY_SDDR_CONTAINERS_COUNT + "_" + userId, 0)
+        _history.value = loadLocalHistory(userId)
+        
+        scope.launch { 
+            loadFromSupabase(userId)
+            fetchCloudHistory()
+        }
+    }
+
     init {
-        _history.value = loadLocalHistory()
-        // Intentar cargar datos de la nube al iniciar
         val userId = settings.getString(KEY_USER_ID, "")
         if (userId.isNotEmpty()) {
-            scope.launch { loadFromSupabase(userId) }
+            setUser(userId)
         }
     }
 
     const val DEPOSIT_VALUE = 0.10f
 
-    fun getBalance(): Float = settings.getFloat(KEY_SDDR_BALANCE, 0f)
-    fun getTotalRecovered(): Float = settings.getFloat(KEY_SDDR_TOTAL_RECOVERED, 0f)
-    fun getContainersCount(): Int = settings.getInt(KEY_SDDR_CONTAINERS_COUNT, 0)
+    fun getBalance(): Float {
+        val userId = settings.getString(KEY_USER_ID, "")
+        return if (userId.isEmpty()) 0f else settings.getFloat(KEY_SDDR_BALANCE + "_" + userId, 0f)
+    }
+
+    fun getTotalRecovered(): Float {
+        val userId = settings.getString(KEY_USER_ID, "")
+        return if (userId.isEmpty()) 0f else settings.getFloat(KEY_SDDR_TOTAL_RECOVERED + "_" + userId, 0f)
+    }
+
+    fun getContainersCount(): Int {
+        val userId = settings.getString(KEY_USER_ID, "")
+        return if (userId.isEmpty()) 0 else settings.getInt(KEY_SDDR_CONTAINERS_COUNT + "_" + userId, 0)
+    }
 
     fun redeemVoucher(qrCode: String): Boolean {
-        // Aseguramos que tenemos el ID de usuario actualizado
         val userId = settings.getString(KEY_USER_ID, "")
         println("[SddrManager] 🔍 Intentando canjear código para usuario [$userId]: $qrCode")
         
@@ -92,9 +122,9 @@ object SddrManager {
                     val newTotal = getTotalRecovered() + totalValue
                     val newCount = getContainersCount() + count
                     
-                    settings.putFloat(KEY_SDDR_BALANCE, newBalance)
-                    settings.putFloat(KEY_SDDR_TOTAL_RECOVERED, newTotal)
-                    settings.putInt(KEY_SDDR_CONTAINERS_COUNT, newCount)
+                    settings.putFloat(KEY_SDDR_BALANCE + "_" + userId, newBalance)
+                    settings.putFloat(KEY_SDDR_TOTAL_RECOVERED + "_" + userId, newTotal)
+                    settings.putInt(KEY_SDDR_CONTAINERS_COUNT + "_" + userId, newCount)
                     
                     _balance.value = newBalance
                     _totalRecovered.value = newTotal
@@ -105,14 +135,8 @@ object SddrManager {
                     
                     autoSync()
                     true
-                } else {
-                    println("[SddrManager] ❌ Formato QR incorrecto: $qrCode")
-                    false
-                }
-            } else {
-                println("[SddrManager] ❌ El código no es un vale SDDR")
-                false
-            }
+                } else false
+            } else false
         } catch (e: Exception) {
             println("[SddrManager] ❌ Error crítico en redeemVoucher: ${e.message}")
             false
@@ -120,45 +144,30 @@ object SddrManager {
     }
 
     private fun saveToHistory(userId: String, title: String, amount: Float) {
-        val prev = settings.getString(KEY_SDDR_HISTORY, "")
+        if (userId.isEmpty()) return
+        
+        val prev = settings.getString(KEY_SDDR_HISTORY + "_" + userId, "")
         val fecha = TimeUtils.getCurrentIsoDate().substringBefore("T")
         val entry = "$title|$amount|$fecha"
         val updated = if (prev.isEmpty()) entry else "$entry;$prev"
-        settings.putString(KEY_SDDR_HISTORY, updated)
+        settings.putString(KEY_SDDR_HISTORY + "_" + userId, updated)
         
-        _history.value = loadLocalHistory()
+        _history.value = loadLocalHistory(userId)
 
-        if (userId.isNotEmpty()) {
-            println("[SddrManager] 🚀 Sincronizando historial con la nube para $userId")
-            scope.launch {
-                try {
-                    println("[SddrManager] 📤 Enviando a Supabase: $title por $amount€")
-                    client.from("historial_sddr").insert(SddrHistoryRow(userId, title, amount))
-                    
-                    // 2. NUEVO: Registrar también en historial general para ECO-COMUNIDAD
-                    // Así aparecerá en el muro de noticias de la app
-                    HistoryManager.addHistoryItem(
-                        objectName = title, // "Vale de Canje" o "Devolución Envase"
-                        points = 50,        // Puntos simbólicos
-                        userId = userId
-                    )
-                    
-                    println("[SddrManager] ✅ Historial guardado con éxito en Supabase y Comunidad")
-                    
-                    // Tras guardar, forzamos recarga para que aparezca en la lista
-                    fetchCloudHistory()
-                } catch (e: Exception) {
-                    println("[SddrManager] ❌ Error Supabase Historial: ${e.message}")
-                    e.printStackTrace()
-                }
+        scope.launch {
+            try {
+                client.from("historial_sddr").insert(SddrHistoryRow(userId, title, amount))
+                HistoryManager.addHistoryItem(objectName = title, points = 50, userId = userId)
+                fetchCloudHistory()
+            } catch (e: Exception) {
+                println("[SddrManager] ❌ Error Supabase Historial: ${e.message}")
             }
-        } else {
-            println("[SddrManager] ⚠️ ERROR CRÍTICO: saveToHistory llamado sin userId")
         }
     }
 
-    private fun loadLocalHistory(): List<SddrHistoryItem> {
-        val raw = settings.getString(KEY_SDDR_HISTORY, "")
+    private fun loadLocalHistory(userId: String): List<SddrHistoryItem> {
+        if (userId.isEmpty()) return emptyList()
+        val raw = settings.getString(KEY_SDDR_HISTORY + "_" + userId, "")
         if (raw.isEmpty()) return emptyList()
         return raw.split(";").mapNotNull { entry ->
             val parts = entry.split("|")
@@ -172,23 +181,23 @@ object SddrManager {
 
     private fun autoSync() {
         val userId = settings.getString(KEY_USER_ID, "")
-        if (userId.isEmpty()) {
-            println("[SddrManager] ⚠️ Sync cancelado: userId vacío")
-            return
-        }
+        if (userId.isEmpty()) return
         
-        scope.launch {
+        syncJob?.cancel()
+        syncJob = scope.launch {
+            // Esperamos 2 segundos sin actividad para enviar (Debounce)
+            kotlinx.coroutines.delay(2000)
             try {
-                println("[SddrManager] 🚀 Actualizando balance en tabla usuarios...")
+                println("[SddrManager] 🚀 Sincronizando balance con Supabase...")
                 client.from("usuarios").update({
                     set("sddr_balance", getBalance())
                     set("sddr_containers", getContainersCount())
                 }) {
                     filter { eq("id", userId) }
                 }
-                println("[SddrManager] ✅ Sincronización de balance exitosa")
+                println("[SddrManager] ✅ Sincronización exitosa")
             } catch (e: Exception) {
-                println("[SddrManager] ❌ Error Sincronización balance: ${e.message}")
+                println("[SddrManager] ❌ Error Sincronización: ${e.message}")
             }
         }
     }
@@ -200,13 +209,13 @@ object SddrManager {
                 .decodeSingleOrNull<SddrUserData>()
 
             result?.let {
-                settings.putFloat(KEY_SDDR_BALANCE, it.sddr_balance)
-                settings.putInt(KEY_SDDR_CONTAINERS_COUNT, it.sddr_containers)
+                settings.putFloat(KEY_SDDR_BALANCE + "_" + userId, it.sddr_balance)
+                settings.putInt(KEY_SDDR_CONTAINERS_COUNT + "_" + userId, it.sddr_containers)
                 
                 _balance.value = it.sddr_balance
                 _totalRecovered.value = it.sddr_balance 
                 _containersCount.value = it.sddr_containers
-                println("[SddrManager] ☁️ Datos cargados desde Supabase: ${it.sddr_balance}€")
+                println("[SddrManager] ☁️ Datos cargados desde Supabase para $userId: ${it.sddr_balance}€, ${it.sddr_containers} envases")
             }
         } catch (e: Exception) {
             println("[SddrManager] ❌ Error cargando desde Supabase: ${e.message}")

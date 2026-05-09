@@ -13,6 +13,7 @@ data class UserModel(
     val display_name: String? = null,
     val puntos: Int = 0,
     val total_scans: Int = 0,
+    val total_xp: Int = 0, // Puntos acumulados de por vida para el nivel
     val profile_picture_url: String? = null,
     val bio: String? = null,
     val notify_push: Boolean = true,

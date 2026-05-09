@@ -185,7 +185,7 @@ fun CollectionScreen(onBackClick: () -> Unit) {
         ModalBottomSheet(
             onDismissRequest = { showSheet = false },
             sheetState = sheetState,
-            containerColor = EcoColors.CardBackground,
+            containerColor = EcoColors.CardBackground.copy(alpha = 0.95f), // Casi opaco para mejor visibilidad
             dragHandle = { BottomSheetDefaults.DragHandle(color = EcoColors.TextSecondary.copy(alpha = 0.5f)) }
         ) {
             ObjectDetailContent(selectedObject!!)
@@ -203,7 +203,7 @@ private fun ObjectDetailContent(obj: EcoObject) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
-            modifier = Modifier.size(100.dp).background(EcoColors.CardPrimary, CircleShape),
+            modifier = Modifier.size(100.dp).background(EcoColors.CardPrimary.copy(alpha = 0.8f), CircleShape),
             contentAlignment = Alignment.Center
         ) {
             Text(obj.emoji, fontSize = 60.sp)
@@ -236,7 +236,10 @@ private fun ObjectDetailContent(obj: EcoObject) {
         
         Spacer(modifier = Modifier.height(24.dp))
         
-        GlassCard(modifier = Modifier.fillMaxWidth()) {
+        GlassCard(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = EcoColors.CardBackground.copy(alpha = 0.8f)
+        ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("Sabías que...", fontWeight = FontWeight.Bold, color = EcoColors.TextPrimary)
                 Spacer(modifier = Modifier.height(8.dp))

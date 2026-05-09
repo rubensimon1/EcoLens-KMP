@@ -45,26 +45,30 @@ fun RewardsScreen(onBackClick: () -> Unit) {
     var snackbarMessage by remember { mutableStateOf("") }
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     var redeemedCoupons by remember { mutableStateOf<List<Coupon>>(emptyList()) }
-
+    var userId by remember { mutableStateOf<String?>(null) }
+    
     LaunchedEffect(Unit) {
-        val dbCoupons = UserRepository().getCouponsFromDb()
-        coupons = dbCoupons.ifEmpty { getSampleCoupons() }
-
-        val userId = UserRepository().getCurrentSessionUserId()
-        if (userId != null) {
-            PointsManager.loadFromSupabase(userId)
+        isLoading = true
+        coupons = UserRepository().getCouponsFromDb().ifEmpty { getSampleCoupons() }
+        userId = UserRepository().getCurrentSessionUserId()
+        val currentUserId = userId
+        if (currentUserId != null) {
+            PointsManager.loadFromSupabase(currentUserId)
             puntos = PointsManager.getPoints()
 
-            val dbRedemptions = UserRepository().getRedemptions(userId)
+            val dbRedemptions = UserRepository().getRedemptions(currentUserId)
             redeemedCoupons = dbRedemptions.map { r ->
                 val matchingCoupon = coupons.find { it.id == r.cupon_id }
                 Coupon(
                     id = r.cupon_id,
-                    title = matchingCoupon?.title ?: "Cupón Canjeado",
+                    title = matchingCoupon?.title ?: "Cupón Especial",
                     pointsCost = matchingCoupon?.pointsCost ?: 0,
-                    createdAt = r.fechaCanje
+                    createdAt = r.fechaCanje,
+                    description = r.codigo_qr ?: "",
+                    redemptionId = r.id, // ID único de la tabla cupones_canjeados
+                    status = r.estado   // "activo" o "usado"
                 )
-            }
+            }.filter { it.status == "activo" } // Solo mostramos los pendientes de usar
         }
         isLoading = false
     }
@@ -268,8 +272,13 @@ fun RewardsScreen(onBackClick: () -> Unit) {
                                             Text(coupon.title, color = EcoColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                                             Text("Válido en tiendas colaboradoras", color = EcoColors.TextSecondary, fontSize = 12.sp)
                                             Spacer(modifier = Modifier.height(16.dp))
+                                            val qrContent = if (coupon.description.startsWith("VAL-")) {
+                                                coupon.description
+                                            } else {
+                                                "ECOLENS:${coupon.id}:${com.rubensimon.ecolens.utils.TimeUtils.getCurrentTimestamp()}"
+                                            }
                                             PlatformQRCodeView(
-                                                content = "ECOLENS:${coupon.id}:${com.rubensimon.ecolens.utils.TimeUtils.getCurrentTimestamp()}",
+                                                content = qrContent,
                                                 modifier = Modifier.size(160.dp).background(Color.White, RoundedCornerShape(12.dp)).padding(12.dp)
                                             )
                                             Spacer(modifier = Modifier.height(16.dp))
@@ -278,16 +287,31 @@ fun RewardsScreen(onBackClick: () -> Unit) {
                                             Spacer(modifier = Modifier.height(16.dp))
                                             
                                             GlassButton(
-                                                onClick = {
-                                                    // NUEVO: Generar notificación dinámica
-                                                    com.rubensimon.ecolens.utils.NotificationManager.addNotification(
-                                                        title = "Premio Validado",
-                                                        description = "¡Validado premio ${coupon.title} con éxito!"
-                                                    )
-                                                    
-                                                    snackbarMessage = "✅ Cupón validado con éxito"
-                                                    redeemedCoupons = redeemedCoupons.filter { it.id != coupon.id }
-                                                },
+                                                 onClick = {
+                                                     scope.launch {
+                                                         val currentId = userId // Capturamos para el smart cast
+                                                         val success = if (currentId != null && coupon.createdAt != null) {
+                                                             UserRepository().validateRedemption(
+                                                                 redemptionId = coupon.redemptionId,
+                                                                 userId = currentId,
+                                                                 cuponId = coupon.id,
+                                                                 fechaCanje = coupon.createdAt
+                                                             )
+                                                         } else false
+                                                         
+                                                         if (success) {
+                                                             com.rubensimon.ecolens.utils.NotificationManager.addNotification(
+                                                                 title = "Premio Validado",
+                                                                 description = "¡Validado premio ${coupon.title} con éxito!"
+                                                             )
+                                                             snackbarMessage = "✅ Cupón validado con éxito"
+                                                             // Quitar de la lista inmediatamente
+                                                             redeemedCoupons = redeemedCoupons.filter { it.createdAt != coupon.createdAt }
+                                                         } else {
+                                                             snackbarMessage = "❌ Error al validar en el servidor"
+                                                         }
+                                                     }
+                                                 },
                                                 containerColor = EcoColors.Success,
                                                 modifier = Modifier.fillMaxWidth().height(44.dp)
                                             ) {
