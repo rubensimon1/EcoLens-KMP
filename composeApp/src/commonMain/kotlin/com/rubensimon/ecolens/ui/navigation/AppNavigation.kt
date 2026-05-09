@@ -25,6 +25,7 @@ import com.rubensimon.ecolens.ui.screens.auth.OnboardingScreen
 import com.rubensimon.ecolens.ui.screens.main.AiChatScreen
 import com.rubensimon.ecolens.ui.screens.main.NotificationsScreen
 import com.rubensimon.ecolens.ui.screens.main.MenuScreen
+import com.rubensimon.ecolens.ui.screens.features.SddrScreen
 import com.rubensimon.ecolens.ui.screens.main.ProfileScreen
 import com.rubensimon.ecolens.ui.screens.main.SettingsScreen
 
@@ -127,9 +128,9 @@ fun AppNavigation(
             MenuScreen(
                 userId = userId,
                 onProfileClick = { navController.navigate(Screen.Profile.route) },
-                onCameraClick = { navController.navigate(Screen.Scan.route) },
+                onCameraClick = { navController.navigate(Screen.Scan.createRoute(false)) },
                 onHistoryClick = { navController.navigate(Screen.History.route) },
-                onMapsClick = { navController.navigate(Screen.Maps.route) },
+                onMapsClick = { navController.navigate(Screen.Maps.createRoute("TODOS")) },
                 onStatsClick = { navController.navigate(Screen.Leaderboard.route) },
                 onAiChatClick = { navController.navigate(Screen.AiChat.route) },
                 onNotificationsClick = { navController.navigate(Screen.Notifications.route) },
@@ -141,12 +142,18 @@ fun AppNavigation(
                     navController.navigate(Screen.Leaderboard.route)
                 },
                 onSettingsClick = { navController.navigate(Screen.Settings.route) },
-                onEcoDexClick = { navController.navigate(Screen.Collection.route) }
+                onEcoDexClick = { navController.navigate(Screen.Collection.route) },
+                onSddrClick = { navController.navigate(Screen.Sddr.route) }
             )
         }
 
-        composable(Screen.Scan.route) {
+        composable(
+            route = Screen.Scan.route,
+            arguments = listOf(navArgument("isSddr") { type = NavType.BoolType })
+        ) { backStackEntry ->
+            val isSddr = backStackEntry.arguments?.getBoolean("isSddr") ?: false
             ScanScreen(
+                isSddr = isSddr,
                 onBackClick = { navController.popBackStack() },
                 onScanComplete = { _, _ -> navController.popBackStack() }
             )
@@ -201,8 +208,15 @@ fun AppNavigation(
             RewardsScreen(onBackClick = { navController.popBackStack() })
         }
 
-        composable(Screen.Maps.route) {
-            MapsScreen(onBackClick = { navController.popBackStack() })
+        composable(
+            route = Screen.Maps.route,
+            arguments = listOf(navArgument("filter") { defaultValue = "TODOS" })
+        ) { backStackEntry ->
+            val filter = backStackEntry.arguments?.getString("filter") ?: "TODOS"
+            MapsScreen(
+                onBackClick = { navController.popBackStack() },
+                initialFilter = filter
+            )
         }
 
         composable(Screen.Collection.route) {
@@ -221,6 +235,14 @@ fun AppNavigation(
         composable(Screen.Notifications.route) {
             // Aquí irá el NotificationsScreen completo
             NotificationsScreen(onBackClick = { navController.popBackStack() })
+        }
+
+        composable(Screen.Sddr.route) {
+            SddrScreen(
+                onBackClick = { navController.popBackStack() },
+                onScanClick = { navController.navigate(Screen.Scan.createRoute(true)) },
+                onMapClick = { navController.navigate(Screen.Maps.createRoute("SDDR")) }
+            )
         }
     }
 }

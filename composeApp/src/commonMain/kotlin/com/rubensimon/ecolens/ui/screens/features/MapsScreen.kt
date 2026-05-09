@@ -20,12 +20,12 @@ import com.rubensimon.ecolens.data.models.maps.RecyclingPoint
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MapsScreen(onBackClick: () -> Unit) {
-    var selectedFilter by remember { mutableStateOf("TODOS") }
+fun MapsScreen(onBackClick: () -> Unit, initialFilter: String = "TODOS") {
+    var selectedFilter by remember { mutableStateOf(initialFilter) }
     var selectedPoint by remember { mutableStateOf<RecyclingPoint?>(null) }
     var showSheet by remember { mutableStateOf(false) }
     var recenterTrigger by remember { mutableStateOf(0) }
-    val filters = listOf("TODOS", "FIJO", "MOVIL", "PROXIMIDAD")
+    val filters = listOf("TODOS", "SDDR", "FIJO", "MOVIL", "PROXIMIDAD")
 
     Box(modifier = Modifier.fillMaxSize()) {
         // ── MAPA (A pantalla completa) ──────────────────────────────────
@@ -50,15 +50,21 @@ fun MapsScreen(onBackClick: () -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Botón de volver flotante
+            // Botón de volver flotante (Estilo EcoLens)
             Surface(
                 onClick = onBackClick,
-                modifier = Modifier.size(40.dp),
+                modifier = Modifier.size(44.dp),
                 shape = CircleShape,
-                color = Color.White.copy(alpha = 0.9f),
-                shadowElevation = 4.dp
+                color = EcoColors.BackgroundDark.copy(alpha = 0.9f),
+                shadowElevation = 6.dp,
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
             ) {
-                Icon(Icons.Default.ArrowBack, "Volver", tint = EcoColors.TextPrimary, modifier = Modifier.padding(8.dp))
+                Icon(
+                    Icons.Default.ArrowBack, 
+                    "Volver", 
+                    tint = Color.White, 
+                    modifier = Modifier.padding(10.dp)
+                )
             }
             
             filters.forEach { filter ->

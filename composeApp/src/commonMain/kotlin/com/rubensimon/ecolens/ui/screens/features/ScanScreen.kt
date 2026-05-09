@@ -29,6 +29,7 @@ import com.rubensimon.ecolens.ui.components.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScanScreen(
+    isSddr: Boolean = false,
     onBackClick: () -> Unit,
     onScanComplete: (objectName: String, points: Int) -> Unit = { _, _ -> }
 ) {
@@ -70,6 +71,7 @@ fun ScanScreen(
             // Vista de la cámara (implementado por plataforma)
             PlatformCameraView(
                 modifier = Modifier.fillMaxSize(),
+                isSddr = isSddr,
                 onScanComplete = onScanComplete
             )
         }
@@ -86,5 +88,6 @@ fun ScanScreen(
 @Composable
 expect fun PlatformCameraView(
     modifier: Modifier,
+    isSddr: Boolean = false,
     onScanComplete: (objectName: String, points: Int) -> Unit
 )

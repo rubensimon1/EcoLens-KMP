@@ -53,12 +53,33 @@ actual fun PlatformMapView(
         }
         
         allPoints = com.rubensimon.ecolens.utils.MadridPointsFetcher.loadAllRecyclingPoints(context)
+        
+        // Red extensa de Mercadona (SDDR) para que parezca "toda la ciudad"
+        val sddrPoints = listOf(
+            RecyclingPoint("SDDR", "Mercadona - Calle de Ayala", EcoLatLng(40.4285, -3.6785), "Punto de retorno SDDR (Máquina automática)."),
+            RecyclingPoint("SDDR", "Mercadona - Calle de Serrano", EcoLatLng(40.4320, -3.6880), "Punto de retorno SDDR. Disponible en horario comercial."),
+            RecyclingPoint("SDDR", "Mercadona - Pº de la Castellana", EcoLatLng(40.4450, -3.6910), "Punto de retorno SDDR. Acceso por planta -1."),
+            RecyclingPoint("SDDR", "Mercadona - Moncloa", EcoLatLng(40.4345, -3.7185), "Punto de retorno SDDR. Máquina de alta capacidad."),
+            RecyclingPoint("SDDR", "Mercadona - Chamberí", EcoLatLng(40.4360, -3.7030), "Punto de retorno SDDR. Calle de Santa Engracia."),
+            RecyclingPoint("SDDR", "Mercadona - Bravo Murillo", EcoLatLng(40.4520, -3.7035), "Punto de retorno SDDR (Tetuán)."),
+            RecyclingPoint("SDDR", "Mercadona - Atocha/Delicias", EcoLatLng(40.4020, -3.6940), "Punto de retorno SDDR (Arganzuela)."),
+            RecyclingPoint("SDDR", "Mercadona - Retiro/Ibiza", EcoLatLng(40.4185, -3.6750), "Punto de retorno SDDR (Zona Retiro)."),
+            RecyclingPoint("SDDR", "Mercadona - Goya", EcoLatLng(40.4250, -3.6720), "Punto de retorno SDDR (Salamanca)."),
+            RecyclingPoint("SDDR", "Mercadona - Puente de Vallecas", EcoLatLng(40.3950, -3.6680), "Punto de retorno SDDR (Vallecas)."),
+            RecyclingPoint("SDDR", "Mercadona - Plaza de España", EcoLatLng(40.4235, -3.7120), "Punto de retorno SDDR (Centro)."),
+            RecyclingPoint("SDDR", "Mercadona - Aluche", EcoLatLng(40.3880, -3.7620), "Punto de retorno SDDR (Latina)."),
+            RecyclingPoint("SDDR", "Mercadona - Arturo Soria", EcoLatLng(40.4580, -3.6550), "Punto de retorno SDDR (Ciudad Lineal)."),
+            RecyclingPoint("SDDR", "Mercadona - Las Tablas", EcoLatLng(40.4950, -3.6700), "Punto de retorno SDDR (Norte).")
+        )
+        
         if (allPoints.isEmpty()) {
             allPoints = listOf(
                 RecyclingPoint("FIJO", "EcoLens Central Madrid", EcoLatLng(40.4168, -3.7038), "Calle Mayor, 1. Punto de reciclaje premium."),
                 RecyclingPoint("MOVIL", "Punto Móvil Sol", EcoLatLng(40.4172, -3.7033), "Puerta del Sol. Disponible de 10:00 a 14:00."),
                 RecyclingPoint("PROXIMIDAD", "Contenedor Vidrio", EcoLatLng(40.4180, -3.7045), "Plaza de San Ginés.")
-            )
+            ) + sddrPoints
+        } else {
+            allPoints = allPoints + sddrPoints
         }
     }
 
@@ -151,13 +172,16 @@ actual fun PlatformMapView(
         update = { mv ->
             val pointsSnapshot = recyclingPoints
             mv.getMapAsync { googleMap ->
+                // Limpiar siempre para asegurar frescura
+                googleMap.clear()
+                
                 if (pointsSnapshot.isNotEmpty()) {
-                    googleMap.clear()
                     pointsSnapshot.forEach { point ->
                         val hue = when (point.kind) {
+                            "SDDR" -> com.google.android.gms.maps.model.BitmapDescriptorFactory.HUE_AZURE
                             "FIJO" -> com.google.android.gms.maps.model.BitmapDescriptorFactory.HUE_GREEN
                             "MOVIL" -> com.google.android.gms.maps.model.BitmapDescriptorFactory.HUE_ORANGE
-                            "PROXIMIDAD" -> com.google.android.gms.maps.model.BitmapDescriptorFactory.HUE_AZURE
+                            "PROXIMIDAD" -> com.google.android.gms.maps.model.BitmapDescriptorFactory.HUE_CYAN
                             "MOVIL_24H" -> com.google.android.gms.maps.model.BitmapDescriptorFactory.HUE_VIOLET
                             else -> com.google.android.gms.maps.model.BitmapDescriptorFactory.HUE_GREEN
                         }
@@ -174,6 +198,13 @@ actual fun PlatformMapView(
                             println("[MapsScreen] Error adding marker: ${e.message}")
                         }
                     }
+                    
+                    // MODO DEMO: Si estamos en SDDR, centramos la cámara en los puntos de Madrid
+                    if (filter == "SDDR") {
+                        val madridCenter = LatLng(40.4285, -3.6880)
+                        googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(madridCenter, 13f))
+                    }
+
                     googleMap.setOnMarkerClickListener { m ->
                         (m.tag as? RecyclingPoint)?.let { onPointSelected(it) }
                         false

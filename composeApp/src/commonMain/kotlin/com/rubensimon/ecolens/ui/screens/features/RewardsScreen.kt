@@ -279,6 +279,12 @@ fun RewardsScreen(onBackClick: () -> Unit) {
                                             
                                             GlassButton(
                                                 onClick = {
+                                                    // NUEVO: Generar notificación dinámica
+                                                    com.rubensimon.ecolens.utils.NotificationManager.addNotification(
+                                                        title = "Premio Validado",
+                                                        description = "¡Validado premio ${coupon.title} con éxito!"
+                                                    )
+                                                    
                                                     snackbarMessage = "✅ Cupón validado con éxito"
                                                     redeemedCoupons = redeemedCoupons.filter { it.id != coupon.id }
                                                 },
