@@ -69,7 +69,8 @@ fun MenuScreen(
     onAiChatClick: () -> Unit,
     onNotificationsClick: () -> Unit,
     onFriendProfileClick: (String) -> Unit,
-    onLeaderboardClick: () -> Unit
+    onLeaderboardClick: () -> Unit,
+    onSddrClick: () -> Unit
 ) {
     var points by remember { mutableIntStateOf(PointsManager.getPoints()) }
     var todayScansCount by remember { mutableIntStateOf(0) }
@@ -184,7 +185,8 @@ fun MenuScreen(
         }
     }
 
-    var hasNewNotifications by rememberSaveable { mutableStateOf(true) } // Persistente entre pantallas
+    val unreadNotifications by com.rubensimon.ecolens.utils.NotificationManager.unreadCount.collectAsState()
+    val hasNewNotifications = unreadNotifications > 0
 
     var isOnline by remember { mutableStateOf(true) }
 
@@ -363,7 +365,6 @@ fun MenuScreen(
                         Box {
                             IconButton(
                                 onClick = { 
-                                    hasNewNotifications = false // Se limpian al entrar
                                     onNotificationsClick() 
                                 }, 
                                 modifier = Modifier.size(40.dp).background(EcoColors.CardPrimary.copy(alpha = 0.4f), CircleShape)
@@ -532,6 +533,7 @@ fun MenuScreen(
                                 Text("Escanear", color = EcoColors.GlassAccent, fontSize = 14.sp, fontWeight = FontWeight.Black)
                             }
                             
+                            ToolOrb("Eco-Retorno", Icons.Default.Autorenew) { onSddrClick() }
                             ToolOrb("Logros", Icons.Default.EmojiEvents) { onAchievementsClick() }
                         }
                         
@@ -684,21 +686,41 @@ fun MissionCard(scans: Int) {
             )
             
             Column(modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp), verticalArrangement = Arrangement.Center) {
+                val isCompleted = scans >= 3
                 Text("Misión del día", color = Color.White.copy(alpha = 0.85f), fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                Text("Escanea 3 objetos", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Black)
+                Text(
+                    if (isCompleted) "¡Misión completada!" else "Escanea 3 objetos", 
+                    color = Color.White, 
+                    fontSize = 22.sp, 
+                    fontWeight = FontWeight.Black
+                )
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                // Botellas luminosas
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    repeat(3) { index ->
-                        val isLit = index < scans
-                        val color = if (isLit) Color.White else Color.White.copy(alpha = 0.3f)
-                        Icon(
-                            Icons.Default.LocalDrink,
-                            contentDescription = null,
-                            tint = color,
-                            modifier = Modifier.size(24.dp)
-                        )
+                // Si está completado, mostramos un gran CHECK, si no, las papeleras
+                if (isCompleted) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier.size(28.dp).background(Color.White.copy(alpha = 0.2f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("¡Buen trabajo, ruben!", color = Color.White.copy(alpha = 0.9f), fontSize = 14.sp)
+                    }
+                } else {
+                    // Botellas luminosas
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        repeat(3) { index ->
+                            val isLit = index < scans
+                            val color = if (isLit) Color.White else Color.White.copy(alpha = 0.3f)
+                            Icon(
+                                Icons.Default.LocalDrink,
+                                contentDescription = null,
+                                tint = color,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -822,7 +844,11 @@ fun ToolOrb(title: String, icon: ImageVector, onClick: () -> Unit) {
 
 @Composable
 fun AnimatedWeeklyLineChart(weeklyData: List<Int>, selectedDayIndex: Int) {
-    val maxScans = (weeklyData.maxOrNull() ?: 1).coerceAtLeast(5)
+    // Ajustamos la escala para que sea menos sensible. 
+    // Usamos un mínimo de 15 para que 3-4 escaneos no llenen todo el gráfico.
+    // Además añadimos un margen del 20% arriba para que los puntos no toquen el borde.
+    val actualMax = weeklyData.maxOrNull() ?: 0
+    val maxScans = (actualMax.toFloat().coerceAtLeast(15f) * 1.2f)
     val days = listOf("L", "M", "X", "J", "V", "S", "D")
     
     var animationPlayed by remember { mutableStateOf(false) }

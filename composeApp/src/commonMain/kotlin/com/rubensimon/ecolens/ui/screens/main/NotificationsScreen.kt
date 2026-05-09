@@ -22,6 +22,7 @@ import com.rubensimon.ecolens.ui.components.GlassCard
 import com.rubensimon.ecolens.ui.components.GlassBackground
 
 data class EcoNotification(
+    val id: String,
     val title: String,
     val description: String,
     val icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -33,12 +34,29 @@ data class EcoNotification(
 fun NotificationsScreen(onBackClick: () -> Unit) {
     var dailyReminderEnabled by remember { mutableStateOf(true) }
     
-    val notifications = remember {
-        listOf(
-            EcoNotification("¡Nuevo Récord!", "Has superado tu media de escaneos semanales. ¡Sigue así!", Icons.Default.EmojiEvents, "Hace 2h", isRead = false),
-            EcoNotification("Logro Desbloqueado", "Has alcanzado el Nivel 2. ¡Felicidades!", Icons.Default.Stars, "Ayer", isRead = false),
-            EcoNotification("Comunidad", "@admin ha compartido una nueva idea de upcycling.", Icons.Default.Groups, "Hace 2 días", isRead = true)
-        )
+    val notificationsState by com.rubensimon.ecolens.utils.NotificationManager.notifications.collectAsState()
+    
+    // Al entrar, marcamos todas como leídas
+    LaunchedEffect(Unit) {
+        com.rubensimon.ecolens.utils.NotificationManager.markAllAsRead()
+    }
+    
+    val notifications = remember(notificationsState) {
+        notificationsState.map { 
+            EcoNotification(
+                id = it.id,
+                title = it.title,
+                description = it.description,
+                icon = when {
+                    it.title.contains("Premio") -> Icons.Default.CardGiftcard
+                    it.title.contains("Récord") -> Icons.Default.EmojiEvents
+                    it.title.contains("Logro") -> Icons.Default.Stars
+                    else -> Icons.Default.Notifications
+                },
+                time = it.time,
+                isRead = it.isRead
+            )
+        }
     }
 
     GlassBackground {

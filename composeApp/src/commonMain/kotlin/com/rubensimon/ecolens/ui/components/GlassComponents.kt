@@ -62,15 +62,15 @@ object EcoColorsDark {
 object EcoColorsLight {
     val GlassGreen = Color(0x332ECC71) 
     val GlassDarkGreen = Color(0xFF2ECC71) 
-    val GlassAccent = Color(0xFF008080) // Deep Teal for contrast
-    val TextPrimary = Color(0xFF003333) // Dark Teal
-    val TextSecondary = Color(0xFF557B7B) 
-    val BackgroundDark = Color(0xFFE0FFF0) // Mint Pastel
-    val CardBackground = Color.White.copy(alpha = 0.6f)
-    val CardPrimary = Color.White.copy(alpha = 0.8f)
-    val Success = Color(0xFF2ECC71)
-    val Warning = Color(0xFFF59E0B)
-    val Error = Color(0xFFEF4444)
+    val GlassAccent = Color(0xFF006666) // Slightly darker teal for better contrast
+    val TextPrimary = Color(0xFF002222) // Darker for readability
+    val TextSecondary = Color(0xFF445555) 
+    val BackgroundDark = Color(0xFFF0FFF4) // Lighter mint/white
+    val CardBackground = Color.White.copy(alpha = 0.7f)
+    val CardPrimary = Color(0xFFE2F3F0).copy(alpha = 0.9f) // Soft tinted background for cards
+    val Success = Color(0xFF16A34A)
+    val Warning = Color(0xFFD97706)
+    val Error = Color(0xFFDC2626)
 }
 
 /** Holder dinámico del tema actual. Se actualiza con [EcoColors.updateTheme]. */
@@ -216,8 +216,8 @@ fun GlassCard(
             .background(backgroundColor)
             .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
             .border(
-                width = 0.5.dp,
-                color = if (isDark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.08f),
+                width = 1.dp,
+                color = if (isDark) Color.White.copy(alpha = 0.12f) else EcoColors.GlassAccent.copy(alpha = 0.15f),
                 shape = shape
             )
     ) {
