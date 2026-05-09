@@ -10,12 +10,16 @@ import kotlinx.serialization.json.Json
 
 object NotificationManager {
     private val settings: Settings by lazy { Settings() }
-    private const val KEY_DYNAMIC_NOTIFICATIONS = "dynamic_notifications_json"
+    private var currentUserId: String = ""
+    
+    private fun getStorageKey() = "notifications_json_$currentUserId"
 
     private val _unreadCount = MutableStateFlow(0)
     val unreadCount: StateFlow<Int> = _unreadCount.asStateFlow()
 
-    // Clase interna para representar la notificación persistente
+    private val _notifications = MutableStateFlow<List<PersistedNotification>>(emptyList())
+    val notifications: StateFlow<List<PersistedNotification>> = _notifications.asStateFlow()
+
     @kotlinx.serialization.Serializable
     data class PersistedNotification(
         val id: String,
@@ -25,35 +29,58 @@ object NotificationManager {
         val isRead: Boolean = false
     )
 
-    private val _notifications = MutableStateFlow<List<PersistedNotification>>(emptyList())
-    val notifications: StateFlow<List<PersistedNotification>> = _notifications.asStateFlow()
-
-    init {
+    /**
+     * Establece el usuario actual y carga sus notificaciones específicas.
+     */
+    fun setUser(userId: String) {
+        println("[NotificationManager] 👤 Intentando establecer usuario: $userId")
+        if (userId.isEmpty()) {
+            println("[NotificationManager] ⚠️ ID de usuario vacío, abortando.")
+            return
+        }
+        
+        // Limpieza inmediata antes de cargar para evitar "fantasmas"
+        _notifications.value = emptyList()
+        currentUserId = userId
+        
+        println("[NotificationManager] 📂 Cargando notificaciones para la llave: ${getStorageKey()}")
         loadNotifications()
     }
 
+    /**
+     * Limpia el estado al cerrar sesión.
+     */
+    fun clearForLogout() {
+        currentUserId = ""
+        _notifications.value = emptyList()
+        updateUnreadCount()
+    }
+
     private fun loadNotifications() {
-        val json = settings.getString(KEY_DYNAMIC_NOTIFICATIONS, "")
+        if (currentUserId.isEmpty()) return
+        
+        val json = settings.getString(getStorageKey(), "")
+        println("[NotificationManager] 📄 JSON cargado para $currentUserId: ${if(json.isEmpty()) "Vacío" else "Con contenido"}")
+        
         if (json.isNotEmpty()) {
             try {
                 val list = Json.decodeFromString<List<PersistedNotification>>(json)
+                println("[NotificationManager] ✅ Se han cargado ${list.size} notificaciones.")
                 _notifications.value = list
             } catch (e: Exception) {
-                _notifications.value = getDefaultNotifications()
+                println("[NotificationManager] ❌ Error al decodificar: ${e.message}")
+                _notifications.value = emptyList()
             }
         } else {
-            _notifications.value = getDefaultNotifications()
+            println("[NotificationManager] ℹ️ No hay notificaciones guardadas. Cuenta nueva.")
+            _notifications.value = emptyList()
         }
         updateUnreadCount()
     }
 
-    private fun getDefaultNotifications() = listOf(
-        PersistedNotification("notif_record", "¡Nuevo Récord!", "Has superado tu media de escaneos semanales. ¡Sigue así!", "Hace 2h"),
-        PersistedNotification("notif_level", "Logro Desbloqueado", "Has alcanzado el Nivel 2. ¡Felicidades!", "Ayer"),
-        PersistedNotification("notif_community", "Comunidad", "@admin ha compartido una nueva idea de upcycling.", "Hace 2 días", isRead = true)
-    )
-
     fun addNotification(title: String, description: String) {
+        if (currentUserId.isEmpty()) return
+        
         val now = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
         val newNotif = PersistedNotification(
             id = "notif_$now",
@@ -68,6 +95,8 @@ object NotificationManager {
     }
 
     fun markAllAsRead() {
+        if (currentUserId.isEmpty()) return
+        
         val updatedList = _notifications.value.map { it.copy(isRead = true) }
         _notifications.value = updatedList
         saveNotifications(updatedList)
@@ -75,8 +104,10 @@ object NotificationManager {
     }
 
     private fun saveNotifications(list: List<PersistedNotification>) {
+        if (currentUserId.isEmpty()) return
         val json = Json.encodeToString(list)
-        settings.putString(KEY_DYNAMIC_NOTIFICATIONS, json)
+        println("[NotificationManager] 💾 Guardando ${list.size} notificaciones para el usuario $currentUserId")
+        settings.putString(getStorageKey(), json)
     }
 
     fun updateUnreadCount() {
