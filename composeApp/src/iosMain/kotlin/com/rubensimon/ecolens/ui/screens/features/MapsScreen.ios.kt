@@ -45,14 +45,40 @@ actual fun PlatformMapView(
     }
 
     LaunchedEffect(Unit) {
-        allPoints = MadridPointsFetcherIOS.loadAllRecyclingPoints()
+        val basePoints = MadridPointsFetcherIOS.loadAllRecyclingPoints()
+        
+        // Red extensa de Mercadona (SDDR) para iOS
+        val sddrPoints = listOf(
+            RecyclingPoint("SDDR", "Mercadona - Calle de Ayala", com.rubensimon.ecolens.data.models.maps.EcoLatLng(40.4285, -3.6785), "Punto de retorno SDDR (Máquina automática)."),
+            RecyclingPoint("SDDR", "Mercadona - Calle de Serrano", com.rubensimon.ecolens.data.models.maps.EcoLatLng(40.4320, -3.6880), "Punto de retorno SDDR. Disponible en horario comercial."),
+            RecyclingPoint("SDDR", "Mercadona - Pº de la Castellana", com.rubensimon.ecolens.data.models.maps.EcoLatLng(40.4450, -3.6910), "Punto de retorno SDDR. Acceso por planta -1."),
+            RecyclingPoint("SDDR", "Mercadona - Moncloa", com.rubensimon.ecolens.data.models.maps.EcoLatLng(40.4345, -3.7185), "Punto de retorno SDDR. Máquina de alta capacidad."),
+            RecyclingPoint("SDDR", "Mercadona - Chamberí", com.rubensimon.ecolens.data.models.maps.EcoLatLng(40.4360, -3.7030), "Punto de retorno SDDR. Calle de Santa Engracia."),
+            RecyclingPoint("SDDR", "Mercadona - Bravo Murillo", com.rubensimon.ecolens.data.models.maps.EcoLatLng(40.4520, -3.7035), "Punto de retorno SDDR (Tetuán)."),
+            RecyclingPoint("SDDR", "Mercadona - Atocha/Delicias", com.rubensimon.ecolens.data.models.maps.EcoLatLng(40.4020, -3.6940), "Punto de retorno SDDR (Arganzuela)."),
+            RecyclingPoint("SDDR", "Mercadona - Retiro/Ibiza", com.rubensimon.ecolens.data.models.maps.EcoLatLng(40.4185, -3.6750), "Punto de retorno SDDR (Zona Retiro)."),
+            RecyclingPoint("SDDR", "Mercadona - Goya", com.rubensimon.ecolens.data.models.maps.EcoLatLng(40.4250, -3.6720), "Punto de retorno SDDR (Salamanca)."),
+            RecyclingPoint("SDDR", "Mercadona - Puente de Vallecas", com.rubensimon.ecolens.data.models.maps.EcoLatLng(40.3950, -3.6680), "Punto de retorno SDDR (Vallecas)."),
+            RecyclingPoint("SDDR", "Mercadona - Plaza de España", com.rubensimon.ecolens.data.models.maps.EcoLatLng(40.4235, -3.7120), "Punto de retorno SDDR (Centro)."),
+            RecyclingPoint("SDDR", "Mercadona - Aluche", com.rubensimon.ecolens.data.models.maps.EcoLatLng(40.3880, -3.7620), "Punto de retorno SDDR (Latina)."),
+            RecyclingPoint("SDDR", "Mercadona - Arturo Soria", com.rubensimon.ecolens.data.models.maps.EcoLatLng(40.4580, -3.6550), "Punto de retorno SDDR (Ciudad Lineal)."),
+            RecyclingPoint("SDDR", "Mercadona - Las Tablas", com.rubensimon.ecolens.data.models.maps.EcoLatLng(40.4950, -3.6700), "Punto de retorno SDDR (Norte).")
+        )
+        
+        allPoints = basePoints + sddrPoints
     }
     
-    LaunchedEffect(recenterTrigger) {
+    LaunchedEffect(recenterTrigger, filter) {
         val mapView = mapViewRef ?: return@LaunchedEffect
-        val madridCenter = CLLocationCoordinate2DMake(40.4168, -3.7038)
-        val span = MKCoordinateSpanMake(0.1, 0.1)
-        mapView.setRegion(MKCoordinateRegionMake(madridCenter, span), animated = true)
+        // Si estamos en modo SDDR, centramos en la zona de Mercadonas
+        val centerCoords = if (filter == "SDDR") {
+            CLLocationCoordinate2DMake(40.4285, -3.6880)
+        } else {
+            CLLocationCoordinate2DMake(40.4168, -3.7038)
+        }
+        val zoomLevel = if (filter == "SDDR") 0.05 else 0.1
+        val span = MKCoordinateSpanMake(zoomLevel, zoomLevel)
+        mapView.setRegion(MKCoordinateRegionMake(centerCoords, span), animated = true)
     }
 
     Box(modifier = modifier) {

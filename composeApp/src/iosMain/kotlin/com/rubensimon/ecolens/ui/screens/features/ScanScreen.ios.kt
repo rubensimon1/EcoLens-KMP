@@ -42,6 +42,7 @@ import kotlin.coroutines.suspendCoroutine
 @Composable
 actual fun PlatformCameraView(
     modifier: Modifier,
+    isSddr: Boolean,
     onScanComplete: (objectName: String, points: Int) -> Unit
 ) {
     val scope = rememberCoroutineScope()
@@ -87,7 +88,8 @@ actual fun PlatformCameraView(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "📷\n\nSimulador detectado\nLa cámara no está disponible.\nPulsa el botón para simular un escaneo.",
+                    text = if (isSddr) "♻️ MODO ECO-RETORNO\n\nSimulador detectado.\nPulsa el botón para simular\nretorno de envase SDDR."
+                          else "📷\n\nSimulador detectado\nLa cámara no está disponible.\nPulsa el botón para simular un escaneo.",
                     color = Color.White.copy(alpha = 0.7f),
                     textAlign = TextAlign.Center,
                     fontSize = 16.sp,
@@ -124,20 +126,24 @@ actual fun PlatformCameraView(
                                 val jpgData = cameraState.capturePhoto()
                                 val (label, pointsEarned, msg) = uploadImageToPredict(jpgData)
 
-                                resultMessage = "✅ $label (+$pointsEarned pts)\n$msg"
-                                PointsManager.addPoints(pointsEarned, "scan")
-                                PointsManager.incrementScans(label)
-                                HistoryManager.addHistoryItem(label, pointsEarned, PointsManager.getUserId())
-                                onScanComplete(label, pointsEarned)
+                                // En modo SDDR forzamos etiqueta SDDR si es envase compatible
+                                val finalLabel = if (isSddr) "$label (SDDR)" else label
+                                val finalPoints = if (isSddr) 10 else pointsEarned
+
+                                resultMessage = "✅ $finalLabel (+$finalPoints pts)\n$msg"
+                                PointsManager.addPoints(finalPoints, if (isSddr) "sddr" else "scan")
+                                PointsManager.incrementScans(finalLabel)
+                                HistoryManager.addHistoryItem(objectName = finalLabel, points = finalPoints, userId = PointsManager.getUserId())
+                                onScanComplete(finalLabel, finalPoints)
                             } else {
                                 // Simulador: escaneo de prueba
                                 delay(1500)
-                                val label = "Bottle"
-                                val pts = 50
+                                val label = if (isSddr) "Botella Plástico (SDDR)" else "Bottle"
+                                val pts = if (isSddr) 10 else 50
                                 resultMessage = "✅ $label (+$pts pts)\n(Simulación)"
-                                PointsManager.addPoints(pts, "scan")
+                                PointsManager.addPoints(pts, if (isSddr) "sddr" else "scan")
                                 PointsManager.incrementScans(label)
-                                HistoryManager.addHistoryItem(label, pts, PointsManager.getUserId())
+                                HistoryManager.addHistoryItem(objectName = label, points = pts, userId = PointsManager.getUserId())
                                 onScanComplete(label, pts)
                             }
                             isScanning = false

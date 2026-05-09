@@ -73,6 +73,7 @@ fun MenuScreen(
     onSddrClick: () -> Unit
 ) {
     var points by remember { mutableIntStateOf(PointsManager.getPoints()) }
+    var totalPoints by remember { mutableIntStateOf(PointsManager.getTotalEarned()) }
     var todayScansCount by remember { mutableIntStateOf(0) }
     var profilePicUrl by remember { mutableStateOf(HistoryManager.getCachedProfilePic(userId)) }
     var username by remember { mutableStateOf(HistoryManager.getCachedUsername(userId)) }
@@ -92,6 +93,7 @@ fun MenuScreen(
             val refreshData: suspend () -> Unit = {
                 // 1. Cargar datos locales INMEDIATAMENTE para respuesta instantánea
                 points = PointsManager.getPoints()
+                totalPoints = PointsManager.getTotalEarned()
                 val itemsToday = HistoryManager.getHistoryForDate(today.dayOfMonth, today.monthNumber)
                 todayScansCount = itemsToday.size
                 dailyScans = HistoryManager.getHistoryForDate(selectedDate.dayOfMonth, selectedDate.monthNumber)
@@ -109,6 +111,7 @@ fun MenuScreen(
                     
                     // 3. Actualizar UI con datos remotos si hubo cambios
                     points = PointsManager.getPoints()
+                    totalPoints = PointsManager.getTotalEarned()
                     val user = userRepo.getUserById(userId)
                     if (user != null) {
                         profilePicUrl = user.profile_picture_url
@@ -255,12 +258,12 @@ fun MenuScreen(
                 ) {
                     // ── HEADER ORBE Y ANILLO DE NIVEL ──────────────
                 // ── Lógica de Nivel con Animación de Reinicio (Tipo Juego) ──
-                val targetLevel = calcularNivel(points)
+                val targetLevel = PointsManager.getLevel()
                 var displayedLevel by remember { mutableStateOf(targetLevel) }
                 val progressAnimatable = remember { androidx.compose.animation.core.Animatable(0f) }
 
-                LaunchedEffect(points) {
-                    val currentLevelInAnim = calcularNivel(points)
+                LaunchedEffect(totalPoints) {
+                    val currentLevelInAnim = PointsManager.getLevel()
                     
                     if (currentLevelInAnim > displayedLevel) {
                         // 1. Completar el círculo actual hasta el 100%
@@ -271,9 +274,7 @@ fun MenuScreen(
                     }
                     
                     // 3. Animar hasta el progreso real actual
-                    val base = getBaseLevelPoints(currentLevelInAnim)
-                    val next = getNextLevelPoints(currentLevelInAnim)
-                    val actualProgress = ((points - base).toFloat() / (next - base)).coerceIn(0f, 1f)
+                    val actualProgress = PointsManager.getProgressToNextLevel()
                     progressAnimatable.animateTo(actualProgress, animationSpec = tween(1200, easing = FastOutSlowInEasing))
                 }
                 
@@ -294,7 +295,10 @@ fun MenuScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         // Avatar Orbe con anillo
                         Box(modifier = Modifier.size(64.dp), contentAlignment = Alignment.Center) {
                             CircularProgressIndicator(progress = { 1f }, modifier = Modifier.fillMaxSize(), color = EcoColors.CardPrimary, strokeWidth = 3.dp)
@@ -353,13 +357,17 @@ fun MenuScreen(
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
-                            Text("$greeting $username!", color = EcoColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                            Text("Hoy", color = EcoColors.TextPrimary, fontSize = 22.sp, fontWeight = FontWeight.Black)
+                            Text("$greeting", color = EcoColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                            Text(username, color = EcoColors.TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        AnimatedLevelBadge(points, todayScansCount)
-                        Spacer(modifier = Modifier.width(12.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        AnimatedLevelBadge(totalPoints, todayScansCount)
+                        
+                        Spacer(modifier = Modifier.width(16.dp))
                         
                         // Icono de Notificaciones con Badge dinámico
                         Box {
@@ -367,9 +375,12 @@ fun MenuScreen(
                                 onClick = { 
                                     onNotificationsClick() 
                                 }, 
-                                modifier = Modifier.size(40.dp).background(EcoColors.CardPrimary.copy(alpha = 0.4f), CircleShape)
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .background(EcoColors.CardPrimary.copy(alpha = 0.8f), CircleShape)
+                                    .border(1.dp, EcoColors.TextPrimary.copy(alpha = 0.1f), CircleShape)
                             ) {
-                                Icon(Icons.Default.Notifications, null, tint = EcoColors.TextPrimary, modifier = Modifier.size(20.dp))
+                                Icon(Icons.Default.Notifications, null, tint = EcoColors.TextPrimary, modifier = Modifier.size(22.dp))
                             }
                             // Solo dibujamos el badge si hay algo nuevo
                             if (hasNewNotifications) {
@@ -379,7 +390,7 @@ fun MenuScreen(
                                         .offset(x = (-2).dp, y = 2.dp)
                                         .size(10.dp)
                                         .background(Color(0xFFFF5252), CircleShape)
-                                        .border(1.5.dp, EcoColors.BackgroundDark, CircleShape)
+                                        .border(1.5.dp, Color.White, CircleShape)
                                 )
                             }
                         }
@@ -388,9 +399,12 @@ fun MenuScreen(
                         
                         IconButton(
                             onClick = { onSettingsClick() }, 
-                            modifier = Modifier.size(40.dp).background(EcoColors.CardPrimary.copy(alpha = 0.4f), CircleShape)
+                            modifier = Modifier
+                                .size(42.dp)
+                                .background(EcoColors.CardPrimary.copy(alpha = 0.8f), CircleShape)
+                                .border(1.dp, EcoColors.TextPrimary.copy(alpha = 0.1f), CircleShape)
                         ) {
-                            Icon(Icons.Default.Settings, null, tint = EcoColors.TextPrimary, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.Settings, null, tint = EcoColors.TextPrimary, modifier = Modifier.size(22.dp))
                         }
                     }
                 }
@@ -933,9 +947,9 @@ fun AnimatedWeeklyLineChart(weeklyData: List<Int>, selectedDayIndex: Int) {
 
 @Composable
 fun AnimatedLevelBadge(points: Int, todayScansCount: Int) {
-    val level = calcularNivel(points)
-    val basePoints = getBaseLevelPoints(level)
-    val nextPoints = getNextLevelPoints(level)
+    val level = PointsManager.getLevel()
+    val basePoints = PointsManager.getBaseLevelPoints(level)
+    val nextPoints = PointsManager.getNextLevelPoints(level)
     
     val currentProgress = (points - basePoints).coerceAtLeast(0)
     val requiredProgress = (nextPoints - basePoints).coerceAtLeast(1)
@@ -990,28 +1004,3 @@ fun AnimatedLevelBadge(points: Int, todayScansCount: Int) {
     }
 }
 
-private fun calcularNivel(puntos: Int): Int = when {
-    puntos < 100 -> 1
-    puntos < 300 -> 2
-    puntos < 600 -> 3
-    puntos < 1000 -> 4
-    puntos < 1500 -> 5
-    else -> (puntos / 500) + 3
-}
-
-private fun getNextLevelPoints(level: Int): Int = when (level) {
-    1 -> 100
-    2 -> 300
-    3 -> 600
-    4 -> 1000
-    else -> (level - 2) * 500
-}
-
-private fun getBaseLevelPoints(level: Int): Int = when (level) {
-    1 -> 0
-    2 -> 100
-    3 -> 300
-    4 -> 600
-    5 -> 1000
-    else -> (level - 3) * 500
-}
