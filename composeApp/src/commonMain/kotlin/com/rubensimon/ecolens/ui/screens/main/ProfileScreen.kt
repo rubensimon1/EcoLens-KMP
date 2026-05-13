@@ -34,6 +34,17 @@ import com.rubensimon.ecolens.utils.rememberPlatformImagePicker
 import com.russhwolf.settings.Settings
 import kotlinx.coroutines.launch
 
+/**
+ * Pantalla de perfil de usuario.
+ * 
+ * Permite visualizar la información de un usuario (propio o ajeno), incluyendo
+ * sus estadísticas, impacto ambiental, logros y actividad reciente.
+ * También permite al usuario actual cambiar su foto de perfil.
+ * 
+ * @param userId ID del usuario a visualizar. Si es null, muestra el perfil del usuario actual.
+ * @param onBackClick Acción al pulsar el botón de volver.
+ * @param onSettingsClick Acción al pulsar el botón de configuración.
+ */
 @Composable
 fun ProfileScreen(
     userId: String?,
@@ -231,6 +242,13 @@ fun ProfileScreen(
     }
 }
 
+/**
+ * Tarjeta que muestra un indicador de impacto ambiental rápido.
+ * 
+ * @param label Descripción del impacto (ej: "CO2 Saved").
+ * @param value Valor numérico con unidades.
+ * @param color Color temático para la tarjeta.
+ */
 @Composable
 fun ImpactCard(label: String, value: String, color: Color, modifier: Modifier = Modifier) {
     val isDark = EcoColors.isDark
@@ -248,6 +266,9 @@ fun ImpactCard(label: String, value: String, color: Color, modifier: Modifier = 
     }
 }
 
+/**
+ * Muestra un par de datos estadísticos (Etiqueta y Valor).
+ */
 @Composable
 fun StatItem(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -256,6 +277,10 @@ fun StatItem(label: String, value: String) {
     }
 }
 
+/**
+ * Sección horizontal desplazable que muestra las insignias del usuario.
+ * Las insignias no desbloqueadas aparecen con un candado y menor opacidad.
+ */
 @Composable
 fun BadgesSection(scans: Int, puntos: Int, nivel: Int) {
     Row(
@@ -285,6 +310,9 @@ fun BadgesSection(scans: Int, puntos: Int, nivel: Int) {
     }
 }
 
+/**
+ * Sección detallada que calcula y muestra el ahorro de recursos (agua, luz, árboles).
+ */
 @Composable
 fun DetailedImpactSection(scans: Int) {
     val waterSaved = scans * 75
@@ -297,6 +325,9 @@ fun DetailedImpactSection(scans: Int) {
     }
 }
 
+/**
+ * Item detallado para la sección de impacto. Utiliza una [GlassCard].
+ */
 @Composable
 fun ImpactDetailItem(emoji: String, title: String, value: String, label: String, color: Color, modifier: Modifier = Modifier) {
     GlassCard(modifier = modifier, cornerRadius = 24) {
@@ -315,6 +346,13 @@ fun ImpactDetailItem(emoji: String, title: String, value: String, label: String,
     }
 }
 
+/**
+ * Calcula el nivel del usuario basado en sus puntos acumulados.
+ * 
+ * Lógica:
+ * - Nivel 1-4: Rangos fijos de puntos.
+ * - Nivel 5+: Un nivel extra por cada 500 puntos.
+ */
 private fun calcularNivel(puntos: Int): Int = when {
     puntos < 100 -> 1
     puntos < 300 -> 2

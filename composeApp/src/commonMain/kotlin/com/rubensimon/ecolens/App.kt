@@ -34,9 +34,17 @@ import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
 import coil3.network.ktor3.KtorNetworkFetcherFactory
 
+/**
+ * Función principal de la aplicación EcoLens.
+ * 
+ * Gestiona el punto de entrada, la inicialización de librerías (Coil), 
+ * el estado del tema, la navegación principal y el diseño base (Scaffold).
+ * 
+ * @param startDestination El destino inicial de la navegación (por defecto "welcome").
+ */
 @Composable
 fun App(startDestination: String = "welcome") {
-    // ── Configuración de Coil (Carga de imágenes de red) ──
+    // Configuración de Coil para la carga asíncrona de imágenes mediante Ktor
     setSingletonImageLoaderFactory { context ->
         ImageLoader.Builder(context)
             .components {
@@ -45,16 +53,17 @@ fun App(startDestination: String = "welcome") {
             .build()
     }
 
-    // ── Gestión del Tema ──
+    // Gestión del tema y preferencias de usuario
     val isSystemDark = isSystemInDarkTheme()
     val settings = remember { Settings() }
 
+    // Determina la ruta inicial basándose en si hay una sesión activa
     val initialRoute = remember {
         val savedUserId = settings.getString("user_id", "")
         if (savedUserId.isNotEmpty()) "menu" else "welcome"
     }
 
-    // Inicializar tema al arrancar
+    // Inicializa el sistema de colores al arrancar la app
     LaunchedEffect(Unit) {
         val currentPref = settings.getBoolean("dark_mode", isSystemDark)
         EcoColors.updateTheme(currentPref)
@@ -88,7 +97,7 @@ fun App(startDestination: String = "welcome") {
             // Fondo base
             Box(modifier = Modifier.fillMaxSize().background(if (isDark) Color(0xFF001A1A) else Color(0xFFE0FFF0)))
 
-            // Orbes de luz
+            // Orbes decorativos animados en el fondo
             Canvas(modifier = Modifier.fillMaxSize().blur(80.dp)) {
                 val primaryOrbColor = if (isDark) Color(0xFF2ECC71).copy(alpha = 0.15f) else Color(0xFF2ECC71).copy(alpha = 0.1f)
                 val secondaryOrbColor = if (isDark) Color(0xFF008080).copy(alpha = 0.2f) else Color(0xFF008080).copy(alpha = 0.15f)
@@ -105,7 +114,7 @@ fun App(startDestination: String = "welcome") {
                 )
             }
 
-            // Contenido de la navegación con efecto de desvanecimiento global
+            // Contenedor de la navegación con soporte para teclado (imePadding)
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -121,6 +130,15 @@ fun App(startDestination: String = "welcome") {
     }
 }
 
+/**
+ * Barra de navegación inferior personalizada con diseño "Moderno".
+ * 
+ * Incluye efectos de desenfoque (glassmorphism), bordes suaves y micro-animaciones
+ * en los iconos al ser seleccionados.
+ * 
+ * @param navController Controlador de navegación para gestionar los clics.
+ * @param currentRoute Ruta actual para resaltar el icono correspondiente.
+ */
 @Composable
 fun ModernBottomBar(navController: NavHostController, currentRoute: String?) {
     val isDark = EcoColors.isDark
@@ -178,8 +196,13 @@ fun ModernBottomBar(navController: NavHostController, currentRoute: String?) {
                         onClick = {
                             if (!selected) {
                                 navController.navigate(route) {
-                                    popUpTo("menu") { saveState = true }
+                                    // Limpiar la pila hasta el inicio para evitar acumulación
+                                    popUpTo(navController.graph.startDestinationId) {
+                                        saveState = true
+                                    }
+                                    // Evitar múltiples copias de la misma pantalla
                                     launchSingleTop = true
+                                    // Restaurar el estado si ya existía
                                     restoreState = true
                                 }
                             }
