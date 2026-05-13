@@ -21,16 +21,46 @@ actual fun PlatformMapView(
     onPointSelected: (RecyclingPoint) -> Unit
 ) {
     var allPoints by remember { mutableStateOf<List<RecyclingPoint>>(emptyList()) }
+    var userLocation by remember { mutableStateOf<platform.CoreLocation.CLLocation?>(null) }
     var mapViewRef by remember { mutableStateOf<MKMapView?>(null) }
     
-    val recyclingPoints = remember(allPoints, filter) {
-        if (filter == "TODOS") allPoints
-        else allPoints.filter { it.kind == filter }
+    val recyclingPoints = remember(allPoints, filter, userLocation) {
+        when (filter) {
+            "TODOS" -> allPoints
+            "SDDR" -> allPoints.filter { it.kind == "SDDR" }
+            "FIJO" -> allPoints.filter { it.kind == "FIJO" }
+            "MOVIL" -> allPoints.filter { it.kind == "MOVIL" || it.kind == "MOVIL_24H" }
+            "PROXIMIDAD" -> {
+                val loc = userLocation
+                if (loc != null) {
+                    allPoints.filter { point ->
+                        val pointLoc = platform.CoreLocation.CLLocation(
+                            latitude = point.position.latitude,
+                            longitude = point.position.longitude
+                        )
+                        loc.distanceFromLocation(pointLoc) < 3000.0 // 3km
+                    }.sortedBy { point ->
+                        val pointLoc = platform.CoreLocation.CLLocation(
+                            latitude = point.position.latitude,
+                            longitude = point.position.longitude
+                        )
+                        loc.distanceFromLocation(pointLoc)
+                    }
+                } else {
+                    allPoints
+                }
+            }
+            else -> allPoints.filter { it.kind == filter }
+        }
     }
 
-    // Delegado para capturar clics en los pins
+    // Delegado para capturar clics en los pins y ubicación
     val mapDelegate = remember {
         object : NSObject(), MKMapViewDelegateProtocol {
+            override fun mapView(mapView: MKMapView, didUpdateUserLocation: MKUserLocation) {
+                userLocation = didUpdateUserLocation.location
+            }
+
             override fun mapView(mapView: MKMapView, didSelectAnnotationView: MKAnnotationView) {
                 val annotation = didSelectAnnotationView.annotation as? MKPointAnnotation ?: return
                 val title = annotation.title ?: ""

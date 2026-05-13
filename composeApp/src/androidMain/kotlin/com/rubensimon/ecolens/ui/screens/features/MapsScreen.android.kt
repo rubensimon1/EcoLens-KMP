@@ -31,11 +31,41 @@ actual fun PlatformMapView(
     var allPoints by remember { mutableStateOf<List<RecyclingPoint>>(emptyList()) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+    var userLocation by remember { mutableStateOf<Location?>(null) }
     var mapInstance by remember { mutableStateOf<com.google.android.gms.maps.GoogleMap?>(null) }
 
-    val recyclingPoints = remember(allPoints, filter) {
-        if (filter == "TODOS") allPoints
-        else allPoints.filter { it.kind == filter }
+    val recyclingPoints = remember(allPoints, filter, userLocation) {
+        when (filter) {
+            "TODOS" -> allPoints
+            "SDDR" -> allPoints.filter { it.kind == "SDDR" }
+            "FIJO" -> allPoints.filter { it.kind == "FIJO" }
+            "MOVIL" -> allPoints.filter { it.kind == "MOVIL" || it.kind == "MOVIL_24H" }
+            "PROXIMIDAD" -> {
+                val loc = userLocation
+                if (loc != null) {
+                    allPoints.filter { point ->
+                        val distance = FloatArray(1)
+                        Location.distanceBetween(
+                            loc.latitude, loc.longitude,
+                            point.position.latitude, point.position.longitude,
+                            distance
+                        )
+                        distance[0] < 3000 // Radio de 3km
+                    }.sortedBy { point ->
+                        val distance = FloatArray(1)
+                        Location.distanceBetween(
+                            loc.latitude, loc.longitude,
+                            point.position.latitude, point.position.longitude,
+                            distance
+                        )
+                        distance[0]
+                    }
+                } else {
+                    allPoints // Fallback: mostrar todos si no hay GPS aún
+                }
+            }
+            else -> allPoints.filter { it.kind == filter }
+        }
     }
 
     val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -91,6 +121,7 @@ actual fun PlatformMapView(
             // Primero intentamos con la última ubicación conocida (rápido)
             fusedLocationClient.lastLocation.addOnSuccessListener { location ->
                 if (location != null) {
+                    userLocation = location
                     googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(location.latitude, location.longitude), 17f))
                 }
             }
@@ -98,6 +129,7 @@ actual fun PlatformMapView(
             fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
                 .addOnSuccessListener { location ->
                     if (location != null) {
+                        userLocation = location
                         googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(location.latitude, location.longitude), 17f))
                     }
                 }

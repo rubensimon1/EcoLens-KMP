@@ -14,27 +14,27 @@ import io.github.jan.supabase.storage.storage
 import kotlinx.datetime.Clock
 
 /**
- * Repositorio KMP para operaciones de usuario en Supabase.
- *
- * Migrado de Android (Context-free). Todas las operaciones son suspend
- * y se ejecutan en coroutines. No depende de Android APIs.
- *
- * ## Cambios respecto al original Android
-/**
- * Repositorio de usuarios para la gestión de datos en Supabase.
- */
- * - `SimpleDateFormat` → `kotlinx-datetime`
- * - `SupabaseClient.client` → `SupabaseClientProvider.client`
- * - `gotrue` → `auth` (supabase-kt v3 renaming)
- * - Eliminado `context: Context` de todos los métodos
+ * Repositorio para la gestión de usuarios y operaciones relacionadas con Supabase.
+ * 
+ * Este componente centraliza todas las llamadas a la base de datos y autenticación
+ * para los perfiles de usuario, historial de escaneos y canje de recompensas.
+ * 
+ * Al ser una implementación KMP, es independiente de la plataforma (Android/iOS)
+ * y utiliza corrutinas para operaciones asíncronas.
  */
 class UserRepository {
+    /** Cliente de Supabase configurado globalmente. */
     private val client = SupabaseClientProvider.client
 
     // ── Crear / Actualizar usuario ──────────────────────────────────────────
 
     /**
-     * Crea un nuevo usuario o actualiza sus puntos y escaneos.
+     * Crea un nuevo registro de usuario o actualiza las estadísticas de uno existente.
+     * 
+     * @param username Nombre de usuario único.
+     * @param puntos Cantidad total de puntos acumulados.
+     * @param totalScans Número total de escaneos realizados.
+     * @return El objeto [UserModel] creado o actualizado, o null en caso de error.
      */
     suspend fun createOrUpdateUser(username: String, puntos: Int, totalScans: Int): UserModel? {
         return try {
@@ -75,6 +75,12 @@ class UserRepository {
 
     // ── Lectura de usuarios ─────────────────────────────────────────────────
 
+    /**
+     * Obtiene el ranking de usuarios con mayor puntuación.
+     * 
+     * @param limit Número máximo de usuarios a retornar (por defecto 10).
+     * @return Lista de [UserModel] ordenada de mayor a menor puntuación.
+     */
     suspend fun getTopUsers(limit: Int = 10): List<UserModel> {
         return try {
             client.from("usuarios")
@@ -89,6 +95,12 @@ class UserRepository {
         }
     }
 
+    /**
+     * Busca un usuario por su nombre de usuario exacto.
+     * 
+     * @param username Nombre a buscar.
+     * @return [UserModel] si existe, null en caso contrario.
+     */
     suspend fun searchUserByUsername(username: String): UserModel? {
         return try {
             client.from("usuarios")
@@ -102,6 +114,12 @@ class UserRepository {
         }
     }
 
+    /**
+     * Recupera un usuario mediante su identificador único (UUID).
+     * 
+     * @param userId Identificador del usuario.
+     * @return [UserModel] encontrado o null si no existe.
+     */
     suspend fun getUserById(userId: String): UserModel? {
         return try {
             client.from("usuarios")
@@ -117,6 +135,15 @@ class UserRepository {
 
     // ── Actualización de perfil ─────────────────────────────────────────────
 
+    /**
+     * Actualiza los puntos y estadísticas de escaneo de un usuario.
+     * 
+     * @param userId ID del usuario.
+     * @param puntos Nueva puntuación total.
+     * @param totalScans Nuevo total de escaneos.
+     * @param co2Saved Cantidad de CO2 ahorrado (uso estadístico).
+     * @return true si la actualización fue exitosa, false de lo contrario.
+     */
     suspend fun updatePoints(userId: String, puntos: Int, totalScans: Int, co2Saved: Float): Boolean {
         return try {
             client.from("usuarios").update({
@@ -133,6 +160,14 @@ class UserRepository {
         }
     }
 
+    /**
+     * Actualiza la información básica del perfil (nombre público y biografía).
+     * 
+     * @param userId ID del usuario.
+     * @param displayName Nombre que se mostrará en la app.
+     * @param bio Breve descripción o biografía.
+     * @return true si se guardó correctamente.
+     */
     suspend fun updateProfileInfo(
         userId: String,
         displayName: String?,
@@ -153,6 +188,13 @@ class UserRepository {
         }
     }
 
+    /**
+     * Actualiza la URL de la imagen de perfil en la base de datos.
+     * 
+     * @param userId ID del usuario.
+     * @param url Enlace público a la imagen.
+     * @return true si la operación fue exitosa.
+     */
     suspend fun updateProfilePictureUrl(userId: String, url: String): Boolean {
         return try {
             client.from("usuarios").update({
@@ -168,6 +210,15 @@ class UserRepository {
         }
     }
 
+    /**
+     * Actualiza las preferencias de notificaciones del usuario.
+     * 
+     * @param userId ID del usuario.
+     * @param push Habilitar notificaciones push.
+     * @param rewards Habilitar avisos de recompensas.
+     * @param email Habilitar notificaciones por correo.
+     * @return true si las preferencias se actualizaron correctamente.
+     */
     suspend fun updateNotificationPreferences(
         userId: String,
         push: Boolean,
@@ -192,6 +243,11 @@ class UserRepository {
 
     // ── Cupones ─────────────────────────────────────────────────────────────
 
+    /**
+     * Recupera la lista de cupones disponibles en la tienda de recompensas.
+     * 
+     * @return Lista de [Coupon] disponibles.
+     */
     suspend fun getCouponsFromDb(): List<Coupon> {
         return try {
             // La tabla 'cupones_tienda' contiene las recompensas disponibles
@@ -204,6 +260,12 @@ class UserRepository {
         }
     }
 
+    /**
+     * Registra el canje de un cupón por parte de un usuario.
+     * 
+     * @param redemption Modelo con los datos del canje (usuario, cupón, fecha).
+     * @return true si el canje se registró correctamente en la base de datos.
+     */
     suspend fun redeemCoupon(redemption: RedemptionModel): Boolean {
         return try {
             client.from("cupones_canjeados").insert(redemption)
@@ -216,14 +278,27 @@ class UserRepository {
         }
     }
 
+    /**
+     * Valida el uso de un cupón previamente canjeado.
+     * 
+     * @param redemptionId ID único del canje (opcional si se usan filtros alternativos).
+     * @param userId ID del usuario.
+     * @param cuponId ID del cupón.
+     * @param fechaCanje Fecha en la que se realizó el canje original.
+     * @return true si el cupón se marcó como "usado" correctamente.
+     */
     suspend fun validateRedemption(redemptionId: String?, userId: String, cuponId: String, fechaCanje: String): Boolean {
         return try {
-            client.from("cupones_canjeados")
+            val response = client.from("cupones_canjeados")
                 .update({
                     set("estado", "usado")
                     set("fecha_uso", com.rubensimon.ecolens.utils.TimeUtils.getCurrentIsoDate())
                 }) {
+                    select() // IMPORTANTE: Pedir que devuelva las filas actualizadas
                     filter { 
+                        // Seguridad atómica: Solo validar si el estado actual es "activo"
+                        eq("estado", "activo")
+                        
                         if (redemptionId != null) {
                             eq("id", redemptionId)
                         } else {
@@ -233,21 +308,35 @@ class UserRepository {
                         }
                     }
                 }
-            println("[UserRepository] ✅ Cupón validado (ID: $redemptionId)")
-            true
+
+            
+            // Verificamos si se actualizó alguna fila. Si la lista está vacía,
+            // significa que el cupón ya estaba usado o no se encontró.
+            val updatedRows = response.decodeList<RedemptionModel>()
+            val isSuccess = updatedRows.isNotEmpty()
+            
+            if (isSuccess) {
+                println("[UserRepository] ✅ Cupón validado (ID: $redemptionId)")
+            } else {
+                println("[UserRepository] ⚠️ Intento de validación fallido: El cupón ya estaba usado o no existe.")
+            }
+            
+            isSuccess
         } catch (e: Exception) {
             println("[UserRepository] ❌ Error validateRedemption: ${e.message}")
             false
         }
     }
 
+
     // ── Upload de foto de perfil ─────────────────────────────────────────────
 
     /**
-     * Sube una imagen a Supabase Storage.
-     * @param userId ID del usuario (usado como nombre de archivo)
-     * @param imageBytes Bytes de la imagen (JPEG comprimido)
-     * @return URL pública de la imagen o null si falla
+     * Sube una nueva foto de perfil a Supabase Storage y actualiza la URL en el perfil del usuario.
+     * 
+     * @param userId ID del usuario.
+     * @param imageBytes Datos binarios de la imagen.
+     * @return URL pública de la imagen subida o null si falla.
      */
     suspend fun uploadProfilePicture(userId: String, imageBytes: ByteArray): String? {
         return try {
@@ -281,6 +370,11 @@ class UserRepository {
 
     // ── Autenticación ───────────────────────────────────────────────────────
 
+    /**
+     * Obtiene el ID del usuario actualmente autenticado en la sesión.
+     * 
+     * @return UUID del usuario o null si no hay sesión iniciada.
+     */
     suspend fun getCurrentSessionUserId(): String? {
         return try {
             client.auth.currentSessionOrNull()?.user?.id
@@ -289,6 +383,11 @@ class UserRepository {
         }
     }
 
+    /**
+     * Obtiene el correo electrónico del usuario autenticado.
+     * 
+     * @return Email del usuario o null si no hay sesión.
+     */
     suspend fun getCurrentUserEmail(): String? {
         return try {
             client.auth.currentSessionOrNull()?.user?.email
@@ -297,6 +396,13 @@ class UserRepository {
         }
     }
 
+    /**
+     * Inicia sesión utilizando email y contraseña.
+     * 
+     * @param email Correo electrónico.
+     * @param password Contraseña.
+     * @return true si el inicio de sesión fue exitoso.
+     */
     suspend fun signIn(email: String, password: String): Boolean {
         return try {
             client.auth.signInWith(io.github.jan.supabase.auth.providers.builtin.Email) {
@@ -310,6 +416,13 @@ class UserRepository {
         }
     }
 
+    /**
+     * Registra un nuevo usuario en Supabase Auth.
+     * 
+     * @param email Correo electrónico.
+     * @param password Contraseña.
+     * @return true si el registro fue exitoso.
+     */
     suspend fun signUp(email: String, password: String): Boolean {
         return try {
             client.auth.signUpWith(io.github.jan.supabase.auth.providers.builtin.Email) {
@@ -323,6 +436,9 @@ class UserRepository {
         }
     }
 
+    /**
+     * Cierra la sesión activa del usuario.
+     */
     suspend fun signOut() {
         try {
             client.auth.signOut()
@@ -331,6 +447,12 @@ class UserRepository {
         }
     }
 
+    /**
+     * Solicita un cambio de correo electrónico. Supabase enviará un correo de confirmación.
+     * 
+     * @param newEmail Nueva dirección de correo.
+     * @return true si la solicitud fue enviada correctamente.
+     */
     suspend fun updateUserEmail(newEmail: String): Boolean {
         return try {
             // En Supabase v3, updateUser envía un correo de confirmación al nuevo email
@@ -345,6 +467,12 @@ class UserRepository {
         }
     }
 
+    /**
+     * Actualiza la contraseña del usuario autenticado.
+     * 
+     * @param newPassword Nueva contraseña.
+     * @return true si la contraseña se actualizó correctamente.
+     */
     suspend fun updateUserPassword(newPassword: String): Boolean {
         return try {
             client.auth.updateUser {
@@ -358,6 +486,12 @@ class UserRepository {
         }
     }
 
+    /**
+     * Obtiene la lista de todos los cupones canjeados por un usuario.
+     * 
+     * @param userId ID del usuario.
+     * @return Lista de [RedemptionModel] ordenada por fecha descendente.
+     */
     suspend fun getRedemptions(userId: String): List<RedemptionModel> {
         return try {
             client.from("cupones_canjeados")
@@ -372,6 +506,13 @@ class UserRepository {
         }
     }
 
+    /**
+     * Obtiene los canjes realizados en una fecha específica.
+     * 
+     * @param userId ID del usuario.
+     * @param isoDate Fecha en formato ISO "YYYY-MM-DD".
+     * @return Lista de [RedemptionModel] para esa fecha.
+     */
     suspend fun getRedemptionsForDate(userId: String, isoDate: String): List<RedemptionModel> {
         return try {
             // isoDate formato "YYYY-MM-DD"
@@ -391,7 +532,10 @@ class UserRepository {
     }
 
     /**
-     * Obtiene la actividad global reciente para el feed de comunidad.
+     * Obtiene la actividad global reciente (historial de escaneos) para la comunidad.
+     * 
+     * @param limit Número máximo de items a recuperar.
+     * @return Lista de [HistoryItemModel].
      */
     suspend fun getGlobalActivity(limit: Int = 10): List<com.rubensimon.ecolens.data.models.social.HistoryItemModel> {
         return try {
@@ -412,21 +556,19 @@ class UserRepository {
     }
 
     /**
-     * Obtiene la actividad global reciente junto con la información de perfil de los usuarios
-     * en una sola consulta optimizada (Join).
+     * Obtiene la actividad global reciente unida con la información de perfil de los usuarios.
+     * 
+     * @param limit Número máximo de items.
+     * @return Lista de pares [HistoryItemModel] y [UserModel].
      */
     suspend fun getGlobalActivityWithProfiles(limit: Int = 10): List<Pair<com.rubensimon.ecolens.data.models.social.HistoryItemModel, UserModel>> {
         return try {
-            // Seleccionamos campos de historial y unimos con la tabla usuarios
-            // Nota: El formato de select para joins en supabase-kt es "*, usuarios(*)"
             val result = client.from("historial_escaneos")
                 .select(Columns.raw("*, usuarios(*)")) {
                     order("created_at", Order.DESCENDING)
                     limit(limit.toLong())
                 }
             
-            // Decodificamos la respuesta. Supabase-kt permite decodificar estructuras anidadas si los modelos coinciden
-            // Si no, podemos usar la respuesta cruda y mapear manualmente
             val data = result.decodeList<com.rubensimon.ecolens.data.models.social.HistoryItemWithUser>()
             data.map { it.toPair() }
         } catch (e: Exception) {
@@ -437,7 +579,10 @@ class UserRepository {
     }
 
     /**
-     * Obtiene el historial completo de un usuario específico.
+     * Recupera el historial de escaneos completo de un usuario específico.
+     * 
+     * @param userId ID del usuario.
+     * @return Lista de [HistoryItemModel] del usuario.
      */
     suspend fun getUserHistory(userId: String): List<com.rubensimon.ecolens.data.models.social.HistoryItemModel> {
         return try {
@@ -453,6 +598,13 @@ class UserRepository {
         }
     }
 
+    /**
+     * Obtiene un mapa de perfiles de usuario a partir de una lista de IDs.
+     * Útil para resolver nombres y avatares en listas de actividad.
+     * 
+     * @param userIds Lista de UUIDs de usuarios.
+     * @return Mapa donde la clave es el ID y el valor es un Par (Nombre, URL de Avatar).
+     */
     suspend fun getUserProfilesMap(userIds: List<String>): Map<String, Pair<String, String?>> {
         return try {
             val users = client.from("usuarios")
@@ -470,6 +622,9 @@ class UserRepository {
 
     // ── Helpers ─────────────────────────────────────────────────────────────
 
+    /**
+     * Obtiene el timestamp actual en formato ISO mediante [TimeUtils].
+     */
     private fun currentTimestamp(): String {
         return com.rubensimon.ecolens.utils.TimeUtils.getCurrentIsoDate() 
     }

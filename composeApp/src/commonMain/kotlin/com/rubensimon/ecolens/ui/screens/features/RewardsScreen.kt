@@ -286,37 +286,47 @@ fun RewardsScreen(onBackClick: () -> Unit) {
                                             
                                             Spacer(modifier = Modifier.height(16.dp))
                                             
-                                            GlassButton(
-                                                 onClick = {
-                                                     scope.launch {
-                                                         val currentId = userId // Capturamos para el smart cast
-                                                         val success = if (currentId != null && coupon.createdAt != null) {
-                                                             UserRepository().validateRedemption(
-                                                                 redemptionId = coupon.redemptionId,
-                                                                 userId = currentId,
-                                                                 cuponId = coupon.id,
-                                                                 fechaCanje = coupon.createdAt
-                                                             )
-                                                         } else false
-                                                         
-                                                         if (success) {
-                                                             com.rubensimon.ecolens.utils.NotificationManager.addNotification(
-                                                                 title = "Premio Validado",
-                                                                 description = "¡Validado premio ${coupon.title} con éxito!"
-                                                             )
-                                                             snackbarMessage = "✅ Cupón validado con éxito"
-                                                             // Quitar de la lista inmediatamente
-                                                             redeemedCoupons = redeemedCoupons.filter { it.createdAt != coupon.createdAt }
-                                                         } else {
-                                                             snackbarMessage = "❌ Error al validar en el servidor"
+                                                var isValidating by remember { mutableStateOf(false) }
+                                                GlassButton(
+                                                     onClick = {
+                                                         if (isValidating) return@GlassButton
+                                                         scope.launch {
+                                                             isValidating = true
+                                                             val currentId = userId 
+                                                             val success = if (currentId != null && coupon.createdAt != null) {
+                                                                 UserRepository().validateRedemption(
+                                                                     redemptionId = coupon.redemptionId,
+                                                                     userId = currentId,
+                                                                     cuponId = coupon.id,
+                                                                     fechaCanje = coupon.createdAt
+                                                                 )
+                                                             } else false
+                                                             
+                                                             if (success) {
+                                                                 com.rubensimon.ecolens.utils.NotificationManager.addNotification(
+                                                                     title = "Premio Validado",
+                                                                     description = "¡Validado premio ${coupon.title} con éxito!"
+                                                                 )
+                                                                 snackbarMessage = "✅ Cupón validado con éxito"
+                                                                 // Quitar de la lista usando el ID único del canje
+                                                                 redeemedCoupons = redeemedCoupons.filter { it.redemptionId != coupon.redemptionId }
+                                                             } else {
+                                                                 snackbarMessage = "❌ Este cupón ya ha sido validado o no es válido"
+                                                             }
+                                                             isValidating = false
                                                          }
-                                                     }
-                                                 },
-                                                containerColor = EcoColors.Success,
-                                                modifier = Modifier.fillMaxWidth().height(44.dp)
-                                            ) {
-                                                Text("Validar Canje")
-                                            }
+                                                     },
+                                                    enabled = !isValidating,
+                                                    containerColor = if (isValidating) EcoColors.CardPrimary else EcoColors.Success,
+                                                    modifier = Modifier.fillMaxWidth().height(44.dp)
+                                                ) {
+                                                    if (isValidating) {
+                                                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+                                                    } else {
+                                                        Text("Validar Canje")
+                                                    }
+                                                }
+
                                         }
                                     }
                                 }

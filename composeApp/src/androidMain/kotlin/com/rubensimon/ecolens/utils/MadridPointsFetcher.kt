@@ -28,6 +28,30 @@ object MadridPointsFetcher {
         try { all += loadPointsFromCsv(context, URL_PUNTOS_MOVILES_CSV, "MOVIL") } catch (e: Exception) { Log.e("Map", "Error CSV", e) }
         try { all += loadPointsFromCsv(context, URL_PUNTOS_PROXIMIDAD_CSV, "PROXIMIDAD") } catch (e: Exception) { Log.e("Map", "Error CSV", e) }
         try { all += loadPointsFromCsv(context, URL_PUNTOS_MOVILES_24H_CSV, "MOVIL_24H") } catch (e: Exception) { Log.e("Map", "Error CSV", e) }
+        
+        // Fallback de seguridad: Red completa de Puntos Fijos de Madrid (16 centros principales)
+        if (all.none { it.kind == "FIJO" }) {
+            all += listOf(
+                RecyclingPoint("FIJO", "Punto Limpio Arganzuela", EcoLatLng(40.3963, -3.6968), "C/ Palos de la Frontera, 11"),
+                RecyclingPoint("FIJO", "Punto Limpio Barajas", EcoLatLng(40.4727, -3.5714), "C/ Almirante Diego de Alvear, s/n"),
+                RecyclingPoint("FIJO", "Punto Limpio Carabanchel", EcoLatLng(40.3644, -3.7314), "C/ San Antolín, s/n"),
+                RecyclingPoint("FIJO", "Punto Limpio Chamartín", EcoLatLng(40.4633, -3.6744), "Avda. Alberto Alcocer, 46"),
+                RecyclingPoint("FIJO", "Punto Limpio Ciudad Lineal", EcoLatLng(40.4431, -3.6425), "Avda. Daroca, s/n"),
+                RecyclingPoint("FIJO", "Punto Limpio Fuencarral-El Pardo", EcoLatLng(40.4822, -3.7121), "C/ Nuestra Señora de Valverde, 193"),
+                RecyclingPoint("FIJO", "Punto Limpio Hortaleza", EcoLatLng(40.4744, -3.6408), "C/ Tomás Redondo, 8"),
+                RecyclingPoint("FIJO", "Punto Limpio Latina", EcoLatLng(40.3855, -3.7432), "C/ Concejal Francisco José Jiménez Martín"),
+                RecyclingPoint("FIJO", "Punto Limpio Moncloa-Aravaca", EcoLatLng(40.4503, -3.7547), "Avda. de Valladolid, s/n"),
+                RecyclingPoint("FIJO", "Punto Limpio Moratalaz", EcoLatLng(40.4072, -3.6339), "C/ Vinateros, s/n"),
+                RecyclingPoint("FIJO", "Punto Limpio Puente de Vallecas", EcoLatLng(40.3844, -3.6542), "C/ Josepa Díaz, s/n"),
+                RecyclingPoint("FIJO", "Punto Limpio San Blas-Canillejas", EcoLatLng(40.4358, -3.6067), "C/ San Romualdo, 20"),
+                RecyclingPoint("FIJO", "Punto Limpio Tetuán", EcoLatLng(40.4650, -3.7028), "Paseo de la Dirección, s/n"),
+                RecyclingPoint("FIJO", "Punto Limpio Usera", EcoLatLng(40.3708, -3.7022), "C/ Cristo de la Victoria, 245"),
+                RecyclingPoint("FIJO", "Punto Limpio Vicálvaro", EcoLatLng(40.4011, -3.5988), "C/ San Cipriano, 81"),
+                RecyclingPoint("FIJO", "Punto Limpio Villa de Vallecas", EcoLatLng(40.3700, -3.6108), "C/ Luis I, s/n"),
+                RecyclingPoint("FIJO", "Punto Limpio Villaverde", EcoLatLng(40.3347, -3.7011), "C/ Resina, s/n")
+            )
+        }
+
         all.filter { it.position.latitude != 0.0 && it.position.longitude != 0.0 }
     }
 
@@ -53,8 +77,8 @@ object MadridPointsFetcher {
                         val attrName = parser.getAttributeValue(null, "nombre") ?: ""
                         when (attrName.uppercase(Locale.getDefault())) {
                             "NOMBRE" -> currentName = safeNextText(parser)
-                            "LATITUD" -> currentLat = safeNextText(parser).toDoubleOrNull()
-                            "LONGITUD" -> currentLng = safeNextText(parser).toDoubleOrNull()
+                            "LATITUD" -> currentLat = safeNextText(parser).replace(",", ".").toDoubleOrNull()
+                            "LONGITUD" -> currentLng = safeNextText(parser).replace(",", ".").toDoubleOrNull()
                             "HORARIO" -> {
                                 val t = safeNextText(parser)
                                 if (!t.isNullOrBlank()) currentSnippet = t

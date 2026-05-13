@@ -45,6 +45,7 @@ import com.rubensimon.ecolens.utils.getTimeAgo
 
 // ── Paletas de color ────────────────────────────────────────────────────────
 
+/** Paleta de colores para el tema oscuro. */
 object EcoColorsDark {
     val GlassGreen = Color(0x3376D7C4) 
     val GlassDarkGreen = Color(0x662ECC71)
@@ -59,6 +60,7 @@ object EcoColorsDark {
     val Error = Color(0xFFEF4444)
 }
 
+/** Paleta de colores para el tema claro. */
 object EcoColorsLight {
     val GlassGreen = Color(0x332ECC71) 
     val GlassDarkGreen = Color(0xFF2ECC71) 
@@ -73,7 +75,11 @@ object EcoColorsLight {
     val Error = Color(0xFFDC2626)
 }
 
-/** Holder dinámico del tema actual. Se actualiza con [EcoColors.updateTheme]. */
+/**
+ * Gestor dinámico del sistema de colores de EcoLens.
+ * 
+ * Permite alternar entre temas claro y oscuro de forma reactiva en toda la aplicación.
+ */
 object EcoColors {
     var GlassGreen by mutableStateOf(EcoColorsDark.GlassGreen)
     var GlassDarkGreen by mutableStateOf(EcoColorsDark.GlassDarkGreen)
@@ -88,6 +94,7 @@ object EcoColors {
     var Error by mutableStateOf(EcoColorsDark.Error)
     var isDark by mutableStateOf(true)
 
+    /** Actualiza todos los colores del sistema basándose en la preferencia del usuario. */
     fun updateTheme(dark: Boolean) {
         this.isDark = dark
         if (dark) {
@@ -117,6 +124,7 @@ object EcoColors {
         }
     }
 
+    /** Genera un color consistente para el avatar basado en el hash del nombre. */
     fun getAvatarColor(name: String): Color {
         val colors = listOf(
             Color(0xFF10B981), // Eco Green
@@ -133,9 +141,9 @@ object EcoColors {
         return colors[index]
     }
 
+    /** Genera un degradado visualmente atractivo para el fondo de un avatar. */
     fun getAvatarGradient(name: String): Brush {
         val baseColor = getAvatarColor(name)
-        // Generamos un color un poco más oscuro para el final del degradado
         val endColor = Color(
             red = (baseColor.red * 0.7f).coerceIn(0f, 1f),
             green = (baseColor.green * 0.7f).coerceIn(0f, 1f),
@@ -151,7 +159,10 @@ object EcoColors {
 }
 
 /**
- * Modificador para añadir un efecto de brillo dinámico (shimmer) suave.
+ * Añade un efecto de brillo dinámico (shimmer) suave al componente.
+ * 
+ * @param durationMillis Duración de un ciclo completo de la animación.
+ * @param delayMillis Tiempo de espera entre ciclos.
  */
 fun Modifier.shimmerEffect(
     durationMillis: Int = 3000,
@@ -178,13 +189,15 @@ fun Modifier.shimmerEffect(
             start = Offset(size.width * xOffset, 0f),
             end = Offset(size.width * (xOffset + 0.5f), size.height)
         )
-        // Dibujamos el brillo usando el tamaño actual pero limitado por el clipping del modifier
         drawRect(brush = brush)
     }
 }
 
 // ── Componentes Composable ───────────────────────────────────────────────────
 
+/**
+ * Contenedor base con el color de fondo del tema y padding para las barras del sistema.
+ */
 @Composable
 fun GlassBackground(
     content: @Composable () -> Unit
@@ -199,6 +212,15 @@ fun GlassBackground(
     }
 }
 
+/**
+ * Tarjeta con efecto "Glassmorphism" (cristal esmerilado).
+ * 
+ * @param modifier Modificador para personalizar tamaño, posición, etc.
+ * @param backgroundColor Color de fondo traslúcido.
+ * @param cornerRadius Radio de las esquinas en DP.
+ * @param onClick Acción opcional al pulsar la tarjeta.
+ * @param content Contenido de la tarjeta.
+ */
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
@@ -228,6 +250,9 @@ fun GlassCard(
     }
 }
 
+/**
+ * Campo de texto estilizado con bordes redondeados y colores del tema.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GlassTextField(
@@ -253,6 +278,9 @@ fun GlassTextField(
     )
 }
 
+/**
+ * Botón principal con diseño redondeado y colores de acento.
+ */
 @Composable
 fun GlassButton(
     onClick: () -> Unit,
@@ -343,7 +371,7 @@ fun Modifier.shimmerEffect(): Modifier {
 }
 
 /**
- * Box con efecto shimmer para usar como placeholder de carga.
+ * Box con efecto shimmer para usar como placeholder de carga (skeleton screen).
  */
 @Composable
 fun SkeletonBox(
@@ -356,6 +384,10 @@ fun SkeletonBox(
             .shimmerEffect()
     )
 }
+
+/**
+ * Cabecera de sección estilizada con icono, título y una línea decorativa degradada.
+ */
 @Composable
 fun StyledHeader(title: String, icon: ImageVector) {
     Row(
@@ -379,8 +411,13 @@ fun StyledHeader(title: String, icon: ImageVector) {
 }
 
 /**
- * Aplica un degradado de desvanecimiento (Fade) en la parte inferior.
- * Ideal para que las listas se desvanezcan suavemente bajo la barra de navegación.
+ * Aplica un degradado de desvanecimiento (Fade) en la parte inferior del componente.
+ * 
+ * Es especialmente útil para listas que deben desaparecer suavemente antes de llegar
+ * al borde de la pantalla o bajo una barra de navegación flotante.
+ * 
+ * @param fadeHeight Altura del área donde se aplica el desvanecimiento.
+ * @param bottomPadding Espacio adicional en la parte inferior antes del fade.
  */
 fun Modifier.fadingEdge(
     fadeHeight: androidx.compose.ui.unit.Dp = 60.dp,
@@ -404,6 +441,9 @@ fun Modifier.fadingEdge(
         )
     }
 
+/**
+ * Etiqueta de estado con icono y fondo traslúcido coloreado.
+ */
 @Composable
 fun StatusBadge(icon: ImageVector, text: String, color: Color) {
     Surface(
@@ -419,6 +459,9 @@ fun StatusBadge(icon: ImageVector, text: String, color: Color) {
     }
 }
 
+/**
+ * Fila que muestra un item de actividad (historial) con emoji, nombre, fecha y puntos.
+ */
 @Composable
 fun ActivityRow(item: com.rubensimon.ecolens.data.models.social.HistoryItem) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {

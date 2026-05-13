@@ -213,9 +213,10 @@ object SddrManager {
                 settings.putInt(KEY_SDDR_CONTAINERS_COUNT + "_" + userId, it.sddr_containers)
                 
                 _balance.value = it.sddr_balance
-                _totalRecovered.value = it.sddr_balance 
+                // No sobreescribimos _totalRecovered aquí con el balance, 
+                // dejaremos que fetchCloudHistory lo calcule de forma real.
                 _containersCount.value = it.sddr_containers
-                println("[SddrManager] ☁️ Datos cargados desde Supabase para $userId: ${it.sddr_balance}€, ${it.sddr_containers} envases")
+                println("[SddrManager] ☁️ Datos cargados desde Supabase para $userId: ${it.sddr_balance}€")
             }
         } catch (e: Exception) {
             println("[SddrManager] ❌ Error cargando desde Supabase: ${e.message}")
@@ -229,20 +230,41 @@ object SddrManager {
         scope.launch {
             try {
                 val results = client.from("historial_sddr")
-                    .select { filter { eq("user_id", userId) } }
+                    .select { 
+                        filter { eq("user_id", userId) }
+                        order("created_at", io.github.jan.supabase.postgrest.query.Order.DESCENDING)
+                    }
                     .decodeList<SddrHistoryRow>()
                 
-                _history.value = results.map { 
+                val historyItems = results.map { 
                     SddrHistoryItem(
                         it.title, 
                         it.amount, 
                         (it.date ?: "Hoy").substringBefore("T")
                     ) 
                 }
-                println("[SddrManager] ☁️ Historial sincronizado (${results.size} elementos)")
+                
+                _history.value = historyItems
+                
+                // Recalcular totales para asegurar consistencia entre dispositivos
+                val totalAmount = results.sumOf { it.amount.toDouble() }.toFloat()
+                val totalContainers = results.sumOf { row ->
+                    // Extraer número de envases del título "Vale SDDR (X envases)"
+                    val regex = "\\((\\d+) envases\\)".toRegex()
+                    val match = regex.find(row.title)
+                    match?.groupValues?.get(1)?.toIntOrNull() ?: 0
+                }
+
+                _totalRecovered.value = totalAmount
+                _containersCount.value = totalContainers
+                
+                // Guardar en settings para persistencia offline
+                settings.putFloat(KEY_SDDR_TOTAL_RECOVERED + "_" + userId, totalAmount)
+                settings.putInt(KEY_SDDR_CONTAINERS_COUNT + "_" + userId, totalContainers)
+
+                println("[SddrManager] ☁️ Historial y totales sincronizados (Total: $totalAmount€, Envases: $totalContainers)")
             } catch (e: Exception) {
                 println("[SddrManager] ❌ Error fetchCloudHistory: ${e.message}")
-                e.printStackTrace()
             }
         }
     }
