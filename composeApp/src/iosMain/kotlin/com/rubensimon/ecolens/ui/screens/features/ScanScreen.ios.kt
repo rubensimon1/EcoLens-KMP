@@ -298,43 +298,26 @@ suspend fun uploadImageToPredict(imageData: NSData): Triple<String, Int, String>
                 return@dataTaskWithRequest
             }
             if (data != null) {
-                val jsonStr = NSString.create(data, NSUTF8StringEncoding) as String
                 try {
-                    // Limpiamos la respuesta de posibles espacios o saltos de línea
-                    val cleanJson = jsonStr.trim()
-                    
-                    if (cleanJson == "{}" || cleanJson.isBlank() || !cleanJson.startsWith("{")) {
+                    // Usar NSJSONSerialization nativo para parsear el JSON de forma fiable
+                    // El parser manual de strings fallaba con ciertos formatos de respuesta del servidor
+                    val jsonObj = NSJSONSerialization.JSONObjectWithData(data, 0UL, null) as? Map<Any?, Any?>
+
+                    if (jsonObj == null) {
                         cont.resume(Triple("Objeto desconocido", 0, "No he podido identificar el objeto. ¡Prueba con más luz!"))
                         return@dataTaskWithRequest
                     }
 
-                    // Extracción más robusta de campos
-                    val label = if (cleanJson.contains("\"label\"")) {
-                        cleanJson.substringAfter("\"label\":\"").substringBefore("\"")
-                            .substringAfter("\"label\":").substringBefore(",").trim('"', ' ', ':')
-                    } else "Objeto"
-                    
-                    val ptsStr = if (cleanJson.contains("\"points_earned\"")) {
-                        cleanJson.substringAfter("\"points_earned\":").substringBefore(",")
-                            .substringBefore("}").trim('"', ' ', ':')
-                    } else "10"
-                    
-                    val msg = if (cleanJson.contains("\"message\"")) {
-                        cleanJson.substringAfter("\"message\":\"").substringBefore("\"")
-                            .substringAfter("\"message\":").substringBefore(",").trim('"', ' ', ':')
-                    } else "Objeto procesado correctamente"
+                    val label = jsonObj["label"] as? String ?: ""
+                    val points = (jsonObj["points_earned"] as? Number)?.toInt() ?: 10
+                    val msg = jsonObj["message"] as? String ?: "Objeto procesado correctamente"
 
-                    // Limpieza final de la etiqueta para evitar basura de JSON
-                    val finalLabel = label.replace("{", "").replace("}", "").replace("\"", "").trim()
-                    val displayLabel = if (finalLabel.isBlank() || finalLabel == "null") "Objeto" else finalLabel
-                    
-                    val points = ptsStr.toIntOrNull() ?: 10
-                    
-                    // Log de depuración para desarrollo interno
-                    // println("[iOS Predict] Resultado: $displayLabel, Puntos: $points")
+                    val displayLabel = if (label.isBlank() || label == "null") "Objeto" else label
+
+                    println("[iOS Predict] label=$displayLabel, pts=$points, msg=$msg")
                     cont.resume(Triple(displayLabel, points, msg))
                 } catch (e: Exception) {
-                    // println("Decode Error: ${e.message} in $jsonStr")
+                    println("[iOS Predict] Error al parsear JSON: ${e.message}")
                     cont.resume(Triple("Objeto", 10, "Error al procesar la respuesta de la IA"))
                 }
             } else {

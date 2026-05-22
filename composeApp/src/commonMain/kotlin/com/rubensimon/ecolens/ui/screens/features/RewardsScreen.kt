@@ -198,25 +198,34 @@ fun RewardsScreen(onBackClick: () -> Unit) {
                                              
                                              val now = Clock.System.now()
                                              val expiration = now.plus(30, DateTimeUnit.DAY, TimeZone.UTC)
+                                             val codigoQr = "VAL-" + now.toEpochMilliseconds().toString().takeLast(6)
                                              
                                              val redemption = com.rubensimon.ecolens.data.models.social.RedemptionModel(
                                                  user_id = userId,
                                                  cupon_id = coupon.id,
                                                  tienda_id = coupon.tiendaId,
-                                                 codigo_qr = "VAL-" + now.toEpochMilliseconds().toString().takeLast(6),
+                                                 codigo_qr = codigoQr,
                                                  fechaCanje = now.toString(),
                                                  fechaUso = now.toString(),
                                                  fechaExpiracion = expiration.toString()
                                              )
                                              
-                                             val success = UserRepository().redeemCoupon(redemption)
-                                             if (success) {
+                                             // redeemCoupon ahora devuelve el RedemptionModel con el id generado por Supabase
+                                             val inserted = UserRepository().redeemCoupon(redemption)
+                                             if (inserted != null) {
                                                  // Descontar puntos de verdad
                                                  val subSuccess = PointsManager.subtractPoints(coupon.pointsCost)
                                                  if (subSuccess) {
                                                      puntos = PointsManager.getPoints()
-                                                     redeemedCoupons = listOf(coupon) + redeemedCoupons
-                                                     snackbarMessage = "✅ ¡${coupon.title} canjeado!"
+                                                     // Guardamos el cupón con el redemptionId REAL de Supabase para validar correctamente
+                                                     val redeemedCoupon = coupon.copy(
+                                                         description = codigoQr,
+                                                         redemptionId = inserted.id,
+                                                         status = "activo",
+                                                         createdAt = now.toString()
+                                                     )
+                                                     redeemedCoupons = listOf(redeemedCoupon) + redeemedCoupons
+                                                     snackbarMessage = "✅ ¡${coupon.title} canjeado! Ve a 'Mis Cupones' para ver el QR."
                                                  } else {
                                                      snackbarMessage = "❌ Error al descontar puntos locales"
                                                  }

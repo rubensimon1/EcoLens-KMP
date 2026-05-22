@@ -262,19 +262,30 @@ class UserRepository {
 
     /**
      * Registra el canje de un cupón por parte de un usuario.
-     * 
+     *
+     * Usa `.select()` para que Supabase devuelva la fila insertada con el `id` generado
+     * automáticamente por la base de datos. Este `id` es necesario para que `validateRedemption`
+     * pueda localizar el canje de forma exacta y atómica.
+     *
      * @param redemption Modelo con los datos del canje (usuario, cupón, fecha).
-     * @return true si el canje se registró correctamente en la base de datos.
+     * @return El [RedemptionModel] insertado con su `id` generado, o null si hubo error.
      */
-    suspend fun redeemCoupon(redemption: RedemptionModel): Boolean {
+    suspend fun redeemCoupon(redemption: RedemptionModel): RedemptionModel? {
         return try {
-            client.from("cupones_canjeados").insert(redemption)
-            println("[UserRepository] ✅ Cupón canjeado: ${redemption.cupon_id}")
-            true
+            // .select() es CRÍTICO: sin él Supabase no devuelve el id generado por la BD.
+            // El redemptionId null causa que validateRedemption use filtros alternativos
+            // que no funcionan correctamente.
+            val inserted = client.from("cupones_canjeados")
+                .insert(redemption) {
+                    select()
+                }
+                .decodeSingle<RedemptionModel>()
+            println("[UserRepository] ✅ Cupón canjeado con id=${inserted.id}: ${redemption.cupon_id}")
+            inserted
         } catch (e: Exception) {
             println("[UserRepository] ❌ Error redeemCoupon (id=${redemption.cupon_id}): ${e.message}")
             e.printStackTrace()
-            false
+            null
         }
     }
 

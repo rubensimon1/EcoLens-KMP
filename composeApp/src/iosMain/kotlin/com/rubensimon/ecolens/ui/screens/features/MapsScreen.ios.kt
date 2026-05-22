@@ -7,6 +7,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.interop.UIKitView
 import com.rubensimon.ecolens.utils.MadridPointsFetcherIOS
 import com.rubensimon.ecolens.data.models.maps.RecyclingPoint
+import platform.CoreLocation.*
 import platform.CoreLocation.CLLocationCoordinate2DMake
 import platform.MapKit.*
 import platform.darwin.NSObject
@@ -21,9 +22,9 @@ actual fun PlatformMapView(
     onPointSelected: (RecyclingPoint) -> Unit
 ) {
     var allPoints by remember { mutableStateOf<List<RecyclingPoint>>(emptyList()) }
-    var userLocation by remember { mutableStateOf<platform.CoreLocation.CLLocation?>(null) }
+    var userLocation by remember { mutableStateOf<CLLocation?>(null) }
     var mapViewRef by remember { mutableStateOf<MKMapView?>(null) }
-    
+
     val recyclingPoints = remember(allPoints, filter, userLocation) {
         when (filter) {
             "TODOS" -> allPoints
@@ -34,13 +35,13 @@ actual fun PlatformMapView(
                 val loc = userLocation
                 if (loc != null) {
                     allPoints.filter { point ->
-                        val pointLoc = platform.CoreLocation.CLLocation(
+                        val pointLoc = CLLocation(
                             latitude = point.position.latitude,
                             longitude = point.position.longitude
                         )
                         loc.distanceFromLocation(pointLoc) < 3000.0 // 3km
                     }.sortedBy { point ->
-                        val pointLoc = platform.CoreLocation.CLLocation(
+                        val pointLoc = CLLocation(
                             latitude = point.position.latitude,
                             longitude = point.position.longitude
                         )
@@ -54,11 +55,38 @@ actual fun PlatformMapView(
         }
     }
 
-    // Delegado para capturar clics en los pins y ubicación
+    // CLLocationManager para solicitar permiso GPS y capturar la ubicación del usuario
+    // Esto es necesario para que MKMapView reciba actualizaciones de ubicación
+    val locationManager = remember { CLLocationManager() }
+
+    val locationDelegate = remember {
+        object : NSObject(), CLLocationManagerDelegateProtocol {
+            override fun locationManager(manager: CLLocationManager, didUpdateLocations: List<*>) {
+                val lastLocation = didUpdateLocations.lastOrNull() as? CLLocation
+                if (lastLocation != null) {
+                    userLocation = lastLocation
+                }
+            }
+
+            override fun locationManagerDidChangeAuthorization(manager: CLLocationManager) {
+                val status = manager.authorizationStatus
+                if (status == kCLAuthorizationStatusAuthorizedWhenInUse ||
+                    status == kCLAuthorizationStatusAuthorizedAlways) {
+                    manager.startUpdatingLocation()
+                }
+            }
+        }
+    }
+
+    // Delegado del mapa para clics en pins
     val mapDelegate = remember {
         object : NSObject(), MKMapViewDelegateProtocol {
             override fun mapView(mapView: MKMapView, didUpdateUserLocation: MKUserLocation) {
-                userLocation = didUpdateUserLocation.location
+                // También actualizamos desde el mapa como respaldo
+                val loc = didUpdateUserLocation.location
+                if (loc != null) {
+                    userLocation = loc
+                }
             }
 
             override fun mapView(mapView: MKMapView, didSelectAnnotationView: MKAnnotationView) {
@@ -75,6 +103,17 @@ actual fun PlatformMapView(
     }
 
     LaunchedEffect(Unit) {
+        // Configurar y solicitar permiso de localización ANTES de que el mapa lo necesite
+        locationManager.delegate = locationDelegate
+        locationManager.desiredAccuracy = kCLLocationAccuracyBest
+        locationManager.requestWhenInUseAuthorization()
+
+        val authStatus = locationManager.authorizationStatus
+        if (authStatus == kCLAuthorizationStatusAuthorizedWhenInUse ||
+            authStatus == kCLAuthorizationStatusAuthorizedAlways) {
+            locationManager.startUpdatingLocation()
+        }
+
         val basePoints = MadridPointsFetcherIOS.loadAllRecyclingPoints()
         
         // Red extensa de Mercadona (SDDR) para iOS
@@ -101,12 +140,13 @@ actual fun PlatformMapView(
     LaunchedEffect(recenterTrigger, filter) {
         val mapView = mapViewRef ?: return@LaunchedEffect
         // Si estamos en modo SDDR, centramos en la zona de Mercadonas
+        // En PROXIMIDAD centramos con zoom más cercano; la ubicación exacta la maneja el delegate
         val centerCoords = if (filter == "SDDR") {
             CLLocationCoordinate2DMake(40.4285, -3.6880)
         } else {
             CLLocationCoordinate2DMake(40.4168, -3.7038)
         }
-        val zoomLevel = if (filter == "SDDR") 0.05 else 0.1
+        val zoomLevel = if (filter == "SDDR") 0.05 else if (filter == "PROXIMIDAD") 0.04 else 0.1
         val span = MKCoordinateSpanMake(zoomLevel, zoomLevel)
         mapView.setRegion(MKCoordinateRegionMake(centerCoords, span), animated = true)
     }
@@ -118,7 +158,12 @@ actual fun PlatformMapView(
                 val mapView = MKMapView()
                 val madridCenter = CLLocationCoordinate2DMake(40.4168, -3.7038)
                 val span = MKCoordinateSpanMake(0.1, 0.1)
-                mapView.setRegion(MKCoordinateRegionMake(madridCenter, span), animated = true)
+                mapView.setRegion(MKCoordinateRegionMake(madridCenter, span), animated = false)
+                // Habilitar explícitamente toda la interacción del usuario con el mapa
+                mapView.scrollEnabled = true
+                mapView.zoomEnabled = true
+                mapView.rotateEnabled = true
+                mapView.pitchEnabled = true
                 mapView.showsUserLocation = true
                 mapView.delegate = mapDelegate
                 mapViewRef = mapView
