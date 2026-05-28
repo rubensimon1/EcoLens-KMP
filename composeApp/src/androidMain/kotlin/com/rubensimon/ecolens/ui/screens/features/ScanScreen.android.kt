@@ -251,52 +251,77 @@ private fun captureAndPredictLocal(
                         // Si no hay barcode, usamos el labeler de imagen
                         labeler.process(image)
                             .addOnSuccessListener { labels ->
-                                // Lógica de mapeo de etiquetas de Google a categorías de reciclaje
                                 var detectedLabel = "Objeto"
                                 var points = 10
                                 var message = "¡Buen trabajo reciclando!"
                                 
                                 val reliableLabels = labels.filter { it.confidence > 0.55f }
                                 
-                                if (reliableLabels.isEmpty()) {
+                                if (reliableLabels.isEmpty() && labels.isEmpty()) {
                                     detectedLabel = "Objeto"
                                     message = "No estoy muy seguro de qué es esto. ¡Asegúrate de que haya buena luz!"
                                 } else {
-                                    val bestLabel = reliableLabels.first()
-                                    val labelText = bestLabel.text.lowercase()
-                                    
-                                    // MODO TFG INTELIGENTE: Si detectamos envases pero no hubo barcode, 
-                                    // también lo tratamos como SDDR para que la demo no falle.
-                                // MODO DEMO TFG: Cualquier cosa detectada se trata como envase SDDR SOLO si venimos de la pantalla SDDR
-                                val isContainerDemo = isSddr 
+                                    if (isSddr) {
+                                        detectedLabel = "Envase SDDR (Simulado)"
+                                        points = 50
+                                        message = "¡Envase detectado! +0.10€ a tu saldo SDDR."
+                                        
+                                        // Trigger SDDR Flow Real
+                                        CoroutineScope(Dispatchers.Main).launch {
+                                            println("[Scanner] 🤖 MODO DEMO: Forzando éxito SDDR")
+                                            val sddrCode = "SDDR|0.10|1|${System.currentTimeMillis()}"
+                                            SddrManager.redeemVoucher(sddrCode)
+                                        }
+                                    } else {
+                                        val permitidos = listOf("bottle", "can", "plastic", "metal", "paper", "cardboard", "glass", "beverage", "tin", "water", "liquid", "drink", "box", "aluminum")
+                                        val objetoValido = labels.firstOrNull { label -> 
+                                            permitidos.any { label.text.lowercase().contains(it) }
+                                        }
 
-                                    when {
-                                        isSddr -> {
-                                            detectedLabel = "Envase SDDR (Simulado)"
-                                            points = 50
-                                            message = "¡Envase detectado! +0.10€ a tu saldo SDDR."
-                                            
-                                            // Trigger SDDR Flow Real
-                                            CoroutineScope(Dispatchers.Main).launch {
-                                                println("[Scanner] 🤖 MODO DEMO: Forzando éxito SDDR")
-                                                val sddrCode = "SDDR|0.10|1|${System.currentTimeMillis()}"
-                                                SddrManager.redeemVoucher(sddrCode)
+                                        if (objetoValido != null) {
+                                            val text = objetoValido.text.lowercase()
+                                            when {
+                                                text.contains("bottle") || text.contains("water") || text.contains("liquid") -> {
+                                                    detectedLabel = "Botella"
+                                                    points = 20
+                                                    message = "¡Buen trabajo reciclando esta botella!"
+                                                }
+                                                text.contains("plastic") -> {
+                                                    detectedLabel = "Envase Plástico"
+                                                    points = 20
+                                                    message = "¡Plástico reciclado correctamente!"
+                                                }
+                                                text.contains("can") || text.contains("tin") || text.contains("aluminum") -> {
+                                                    detectedLabel = "Lata Metálica"
+                                                    points = 25
+                                                    message = "¡El aluminio es 100% reciclable!"
+                                                }
+                                                text.contains("glass") -> {
+                                                    detectedLabel = "Vidrio"
+                                                    points = 25
+                                                    message = "¡El vidrio se recicla indefinidamente!"
+                                                }
+                                                text.contains("paper") || text.contains("cardboard") || text.contains("box") -> {
+                                                    detectedLabel = "Cartón/Papel"
+                                                    points = 15
+                                                    message = "¡Buen trabajo con el papel/cartón!"
+                                                }
+                                                else -> {
+                                                    detectedLabel = "Envase Mixto"
+                                                    points = 15
+                                                    message = "Objeto reciclable detectado."
+                                                }
                                             }
-                                        }
-                                        labelText.contains("bottle") || labelText.contains("can") || labelText.contains("glass") -> {
-                                            detectedLabel = "Envase/Vidrio"
-                                            points = 20
-                                            message = "¡Buen trabajo reciclando este envase!"
-                                        }
-                                        labelText.contains("paper") || labelText.contains("cardboard") -> {
-                                            detectedLabel = "Papel/Cartón"
-                                            points = 15
-                                            message = "¡Buen trabajo con el papel!"
-                                        }
-                                        else -> {
-                                            detectedLabel = bestLabel.text
-                                            points = 10
-                                            message = "Objeto detectado: ${bestLabel.text}"
+                                        } else {
+                                            val bestLabel = reliableLabels.firstOrNull() ?: labels.firstOrNull()
+                                            if (bestLabel != null) {
+                                                detectedLabel = bestLabel.text
+                                                points = 10
+                                                message = "Viendo: ${bestLabel.text} (No reciclable)"
+                                            } else {
+                                                detectedLabel = "Objeto"
+                                                message = "No reconozco este objeto. ¡Intenta con mejor luz!"
+                                            }
                                         }
                                     }
                                 }
