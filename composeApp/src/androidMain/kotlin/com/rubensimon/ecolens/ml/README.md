@@ -14,3 +14,6 @@ Este módulo se encarga de recibir los fotogramas de la cámara (capturados en l
 ## Notas
 
 Al ser un módulo bajo `androidMain`, utiliza librerías nativas de Android y Google ML Kit / TensorFlow Lite que no están disponibles en la capa común multiplataforma.
+
+
+_Documentación actualizada para sincronización_

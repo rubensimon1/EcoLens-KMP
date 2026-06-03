@@ -63,3 +63,5 @@ Desarrollada bajo la filosofía de **Kotlin Multiplatform (KMP)**, EcoLens ofrec
 
 **Desarrollado por Rubens Simon** - *Proyecto de Fin de Grado (TFG)*  
 *Comprometidos con un futuro más verde a través de la tecnología.*
+
+_Documentación actualizada para sincronización_

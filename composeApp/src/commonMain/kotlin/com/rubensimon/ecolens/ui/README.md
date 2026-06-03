@@ -14,3 +14,6 @@ Esta carpeta contiene todos los componentes visuales y la lógica de presentaci�
 ## 🎨 Principios de Diseño
 - **Material 3 y Custom UI**: Utilizamos la base de Material 3 ampliada con modificadores personalizados (Glassmorphism, desenfoques, gradientes vibrantes).
 - **Separación de Responsabilidades**: Las vistas no deben realizar peticiones de red directamente. Deben delegar esa responsabilidad en funciones o en la capa de datos.
+
+
+_Documentación actualizada para sincronización_

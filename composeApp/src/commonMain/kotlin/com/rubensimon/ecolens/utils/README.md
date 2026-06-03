@@ -10,3 +10,6 @@ Esta carpeta funciona como la caja de herramientas de la aplicación EcoLens. Co
 
 ## ⚙️ Persistencia Local
 En lugar de depender exclusivamente de llamadas de red (lo que ralentizaría la app), módulos como `PointsManager` utilizan **`multiplatform-settings`** (el equivalente a SharedPreferences/NSUserDefaults en KMP). Esto garantiza una interfaz veloz, relegando la sincronización en la nube a un segundo plano (Dispatchers.IO).
+
+
+_Documentación actualizada para sincronización_

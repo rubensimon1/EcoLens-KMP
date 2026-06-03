@@ -11,3 +11,6 @@ Esta carpeta contiene la implementación centralizada de la gestión de datos en
 ## 🔒 Buenas Prácticas
 - Las consultas a Supabase deben envolverse en bloques `try/catch` y ejecutarse siempre bajo el dispatcher `Dispatchers.IO` para no bloquear el hilo principal (UI).
 - Los modelos deben estar sincronizados de forma estricta con el esquema de columnas y políticas RLS de Supabase.
+
+
+_Documentación actualizada para sincronización_
