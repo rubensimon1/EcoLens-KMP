@@ -11,13 +11,8 @@ import com.google.mlkit.vision.label.custom.CustomImageLabelerOptions
 import java.util.concurrent.TimeUnit
 
 /**
- * Clasificador TFLite propio (opcional).
- *
- * Coloca en `composeApp/src/androidMain/assets/`:
- * - `ecolens_model.tflite` — tu modelo entrenado
- * - `labels.txt` (opcional) — una etiqueta por línea, mismo orden que el modelo
- *
- * Si el archivo no existe, la app sigue con ML Kit base + Gemini/backend.
+ * Clasificador de imágenes personalizado basado en TFLite.
+ * Gestiona la detección local de objetos mediante el modelo entrenado.
  */
 object EcoLensCustomLabeler {
 

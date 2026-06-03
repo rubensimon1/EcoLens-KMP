@@ -78,11 +78,7 @@ data class DetectionFrame(
 )
 
 /* =========================================================================
- *  CONFIGURACIÓN — Mismo enfoque que EcoLensTFG (que funciona al 99%)
- *
- *  Estrategia: ImageLabeling DIRECTO sobre el frame raw del ImageProxy.
- *  Sin conversiones a Bitmap, sin Object Detection, sin recortes.
- *  Es el approach que funciona en EcoLensTFG y la base de apps profesionales.
+ *  Configuración del Escáner y Modelos
  * ========================================================================= */
 
 /** Umbral de confianza para aceptar etiquetas de ML Kit. */
@@ -1382,10 +1378,10 @@ private fun calcularPuntos(label: String): Pair<Int, String> {
         return Pair(0, "No reciclable / Desconocido")
     }
     return when {
-        t == "envases" -> Pair(20, "¡Envase reciclado correctamente!")
-        t == "papel y cartón" || t == "papel y carton" -> Pair(15, "¡Papel/Cartón reciclado!")
-        t == "vidrio" -> Pair(25, "¡Vidrio reciclado correctamente!")
-        t == "orgánico" || t == "organico" -> Pair(10, "¡Residuo orgánico separado correctamente!")
+        t == "envases" -> Pair(20, "¡Envase depositado en el Contenedor Amarillo!")
+        t == "papel y cartón" || t == "papel y carton" -> Pair(15, "¡Depositado en el Contenedor Azul!")
+        t == "vidrio" -> Pair(25, "¡Depositado en el Contenedor Verde!")
+        t == "orgánico" || t == "organico" -> Pair(10, "¡Depositado en el Contenedor Marrón!")
 
         t.contains("botella de plástico") -> Pair(20, "¡Botella de plástico reciclada!")
         t.contains("botella de vidrio") || t.contains("botella de vino") -> Pair(25, "¡Botella de vidrio reciclada!")

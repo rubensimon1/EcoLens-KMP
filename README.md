@@ -9,8 +9,9 @@ Desarrollada bajo la filosofía de **Kotlin Multiplatform (KMP)**, EcoLens ofrec
 ## ✨ Características de Última Generación
 
 ### 📸 Escaneo con IA y Reconocimiento de Materiales
-*   **Identificación Instantánea**: Reconoce plástico, latas, papel, vidrio y más mediante modelos de Computer Vision optimizados para móvil.
-*   **Guía de Contenedores**: Indica el color exacto del contenedor (Amarillo, Azul, Verde, Marrón, RAEE) para evitar errores de separación.
+*   **Modelo de IA Propio (TFLite)**: Incorpora un modelo entrenado específicamente para reconocer con alta precisión las 4 categorías principales: **Vidrio, Papel y Cartón, Envases y Orgánico**. Este modelo estandariza la lectura y asegura una clasificación impecable.
+*   **Identificación Avanzada (Fallback)**: Si el objeto no entra en las categorías principales, un sistema de red de seguridad (ML Kit y Gemini) actúa por debajo para identificar plástico, latas u otros objetos complejos con gran precisión.
+*   **Guía de Contenedores**: Indica el color exacto del contenedor (Amarillo, Azul, Verde, Marrón, RAEE) directamente en pantalla y en tiempo real para evitar errores de separación.
 
 ### 🏆 Gamificación y Progresión (XP & Niveles)
 *   **Sistema de Niveles Blindado**: Progresión basada en puntos de experiencia (XP) acumulados de por vida, sincronizada de forma segura en la nube.
