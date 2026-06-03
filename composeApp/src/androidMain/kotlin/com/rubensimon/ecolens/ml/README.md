@@ -1,21 +1,16 @@
-# Módulo de Inteligencia Artificial (ML Layer)
+# Módulo de Machine Learning (ML) - Android
 
-Esta carpeta es exclusiva del *source set* `androidMain`, ya que contiene la implementación directa de los motores de Machine Learning nativos que procesan el flujo de la cámara en Android.
+Este paquete contiene la implementación específica de Android para el procesamiento de imágenes y la detección de objetos mediante Inteligencia Artificial en el proyecto EcoLens.
 
-## 🧠 Arquitectura Híbrida de IA
+## Componentes Principales
 
-EcoLens utiliza un enfoque de embudo (Fallback System) en **3 capas** para garantizar máxima velocidad y máxima precisión:
+*   **EcoLensMlBackend.kt**: Interfaz y lógica de backend para la integración de modelos de Machine Learning.
+*   **EcoLensCustomLabeler.kt**: Implementación del etiquetador personalizado para el análisis de imágenes y reconocimiento de objetos de reciclaje utilizando modelos entrenados.
 
-1. **Capa 1: Custom TFLite (Alta Precisión Local)**
-   - Archivo: `EcoLensCustomLabeler.kt`
-   - Función: Es el modelo de IA principal, entrenado a medida e incrustado en los `assets` de la app. Funciona 100% offline.
-   - Categorías Estrictas: Agrupa todo lo que reconoce en las 4 macro-categorías clave del proyecto: **Vidrio, Papel y Cartón, Envases y Orgánico**.
+## Funcionamiento
 
-2. **Capa 2: Google ML Kit (Red de Seguridad Local)**
-   - Utilizado directamente en `ScanScreen.android.kt`.
-   - Función: Si el modelo TFLite no reconoce el objeto o su nivel de confianza es muy bajo, se activa el modelo genérico de Google ML Kit (Image Labeling Base).
-   - Capacidad: Puede devolver etiquetas más específicas como "Botella de Plástico", "Lata de Conservas" o "Periódico".
+Este módulo se encarga de recibir los fotogramas de la cámara (capturados en la capa de UI específica de Android o común) y pasarlos por el modelo de IA para identificar si los objetos en pantalla son reciclables y a qué contenedor pertenecen.
 
-3. **Capa 3: Gemini Cloud / ML Backend (El Oráculo)**
-   - Archivos: `EcoLensMlBackend.kt` (Endpoints de Python) o llamadas a Gemini (Google AI).
-   - Función: Es el último recurso. Si las inteligencias locales fallan, la app congela el fotograma y lo envía a la nube en formato JSON Mode para que un modelo gigante emita un veredicto definitivo. Requiere internet y se utiliza solo cuando es estrictamente necesario.
+## Notas
+
+Al ser un módulo bajo `androidMain`, utiliza librerías nativas de Android y Google ML Kit / TensorFlow Lite que no están disponibles en la capa común multiplataforma.
