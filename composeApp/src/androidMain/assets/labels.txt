@@ -1,0 +1,4 @@
+0 Envases
+1 Papel y Cartón
+2 Vidrio
+3 Orgánico

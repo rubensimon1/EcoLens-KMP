@@ -299,30 +299,35 @@ fun RewardsScreen(onBackClick: () -> Unit) {
                                                 GlassButton(
                                                      onClick = {
                                                          if (isValidating) return@GlassButton
+                                                         isValidating = true
                                                          scope.launch {
-                                                             isValidating = true
-                                                             val currentId = userId 
-                                                             val success = if (currentId != null && coupon.createdAt != null) {
-                                                                 UserRepository().validateRedemption(
-                                                                     redemptionId = coupon.redemptionId,
-                                                                     userId = currentId,
-                                                                     cuponId = coupon.id,
-                                                                     fechaCanje = coupon.createdAt
-                                                                 )
-                                                             } else false
-                                                             
-                                                             if (success) {
-                                                                 com.rubensimon.ecolens.utils.NotificationManager.addNotification(
-                                                                     title = "Premio Validado",
-                                                                     description = "¡Validado premio ${coupon.title} con éxito!"
-                                                                 )
-                                                                 snackbarMessage = "✅ Cupón validado con éxito"
-                                                                 // Quitar de la lista usando el ID único del canje
-                                                                 redeemedCoupons = redeemedCoupons.filter { it.redemptionId != coupon.redemptionId }
-                                                             } else {
-                                                                 snackbarMessage = "❌ Este cupón ya ha sido validado o no es válido"
+                                                             try {
+                                                                 val currentId = userId 
+                                                                 val success = if (currentId != null && coupon.createdAt != null) {
+                                                                     UserRepository().validateRedemption(
+                                                                         redemptionId = coupon.redemptionId,
+                                                                         userId = currentId,
+                                                                         cuponId = coupon.id,
+                                                                         fechaCanje = coupon.createdAt
+                                                                     )
+                                                                 } else false
+                                                                 
+                                                                 if (success) {
+                                                                     com.rubensimon.ecolens.utils.NotificationManager.addNotification(
+                                                                         title = "Premio Validado",
+                                                                         description = "¡Validado premio ${coupon.title} con éxito!"
+                                                                     )
+                                                                     snackbarMessage = "✅ Cupón validado con éxito"
+                                                                     // Quitar de la lista usando el ID único del canje
+                                                                     redeemedCoupons = redeemedCoupons.filter { it.redemptionId != coupon.redemptionId }
+                                                                 } else {
+                                                                     snackbarMessage = "❌ Este cupón ya ha sido validado o no es válido"
+                                                                 }
+                                                             } catch (e: Exception) {
+                                                                 snackbarMessage = "❌ Error de conexión al validar el cupón"
+                                                             } finally {
+                                                                 isValidating = false
                                                              }
-                                                             isValidating = false
                                                          }
                                                      },
                                                     enabled = !isValidating,

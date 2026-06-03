@@ -27,6 +27,7 @@ val generateSecrets by tasks.registering {
         val supabaseUrl = (props.getProperty("SUPABASE_URL") ?: "").trim()
         val supabaseKey = (props.getProperty("SUPABASE_KEY") ?: "").trim()
         val mlBackendUrl = (props.getProperty("ML_BACKEND_URL") ?: "").trim()
+        val geminiApiKey = (props.getProperty("GEMINI_API_KEY") ?: "").trim()
 
         fun escapeKotlin(value: String): String =
             value.replace("\\", "\\\\").replace("\"", "\\\"")
@@ -44,6 +45,7 @@ val generateSecrets by tasks.registering {
                 const val SUPABASE_URL: String = "${escapeKotlin(supabaseUrl)}"
                 const val SUPABASE_KEY: String = "${escapeKotlin(supabaseKey)}"
                 const val ML_BACKEND_URL: String = "${escapeKotlin(mlBackendUrl)}"
+                const val GEMINI_API_KEY: String = "${escapeKotlin(geminiApiKey)}"
             }
             """.trimIndent()
         )
@@ -84,6 +86,8 @@ kotlin {
             implementation("com.google.android.gms:play-services-maps:18.2.0")
             implementation("com.google.android.gms:play-services-location:21.2.0")
             implementation("com.google.mlkit:image-labeling:17.0.8")
+            implementation("com.google.mlkit:image-labeling-custom:17.0.2")
+            implementation("com.google.mlkit:text-recognition:16.0.1")
             implementation("com.google.mlkit:barcode-scanning:17.2.0")
             implementation("androidx.camera:camera-core:1.3.0")
             implementation("androidx.camera:camera-camera2:1.3.0")
