@@ -110,7 +110,7 @@ fun CollectionScreen(onBackClick: () -> Unit) {
                 )
             } else {
                 // Progreso
-                val unlockedCount = ecoObjects.count { it.name in unlockedSet }
+                val unlockedCount = ecoObjects.count { checkIfUnlocked(it, unlockedSet) }
                 val progress = if (ecoObjects.isEmpty()) 0f else unlockedCount.toFloat() / ecoObjects.size
                 GlassCard(
                     modifier = Modifier
@@ -162,7 +162,7 @@ fun CollectionScreen(onBackClick: () -> Unit) {
                     modifier = Modifier.widthIn(max = 800.dp)
                 ) {
                     items(ecoObjects) { obj ->
-                        val isUnlocked = obj.key in unlockedSet || obj.name in unlockedSet
+                        val isUnlocked = checkIfUnlocked(obj, unlockedSet)
                         CollectionCell(
                             emoji = obj.emoji,
                             name = if (isUnlocked) obj.name else "???",
@@ -381,6 +381,7 @@ private val ecoObjects = listOf(
     EcoObject("PizzaBox", "🍕", "Caja de Pizza", "Azul", "Solo si está limpia. Si tiene mucha grasa, debe ir al contenedor gris.", "4 meses"),
     EcoObject("Book", "📚", "Libros Viejos", "Azul", "Si están en buen estado, ¡mejor dónalos! Si no, al contenedor azul.", "1 año"),
     EcoObject("FlourBag", "🍞", "Bolsa de Harina", "Azul", "Las bolsas de papel de harina o azúcar son reciclables aquí.", "2 meses"),
+    EcoObject("Notebook", "📓", "Cuaderno", "Azul", "Los cuadernos tienen papel reciclable, pero recuerda quitar la espiral metálica.", "1 año"),
 
     // --- CONTENEDOR VERDE (Vidrio) ---
     EcoObject("GlassBottle", "🍾", "Botella de Vidrio", "Verde", "El vidrio nunca pierde sus propiedades al reciclarse.", "4000 años"),
@@ -394,6 +395,7 @@ private val ecoObjects = listOf(
     EcoObject("Cork", "🍷", "Tapón de Corcho", "Orgánico", "El corcho natural es biodegradable y compostable.", "50 años"),
     EcoObject("TeaBag", "🍵", "Bolsa de Té", "Orgánico", "La mayoría son biodegradables, pero comprueba que no tengan grapas.", "2 meses"),
     EcoObject("Napkin", "🧻", "Servilleta Sucia", "Orgánico", "Si tiene restos de comida, va al orgánico. Si está limpia, al azul.", "1 mes"),
+    EcoObject("Banana", "🍌", "Plátano", "Orgánico", "La piel de plátano es excelente para hacer compost de calidad.", "2-10 días"),
 
     // --- ESPECIALES / PUNTO LIMPIO / OTROS ---
     EcoObject("Battery", "🔋", "Pilas y Baterías", "Especial", "Altamente contaminantes. Una sola pila de botón contamina 600k L de agua.", "500 años"),
@@ -410,4 +412,80 @@ private val ecoObjects = listOf(
     EcoObject("Toy", "🧸", "Juguete Roto", "Punto Limpio", "Si tienen electrónica, al RAEE. Si son solo plástico duro, al Punto Limpio.", "500 años"),
     EcoObject("Thermometer", "🌡️", "Termómetro", "Especial", "Los antiguos de mercurio son extremadamente peligrosos si se rompen.", "Indefinido"),
     EcoObject("Fluorescent", "🔦", "Fluorescente", "Especial", "Contienen vapor de mercurio y deben reciclarse con cuidado.", "Indefinido"),
+    EcoObject("Pen", "🖊️", "Bolígrafo/Lápiz", "Punto Limpio", "Los bolígrafos están hechos de múltiples plásticos y metales difíciles de separar.", "100 años"),
 )
+
+private fun checkIfUnlocked(obj: EcoObject, unlockedSet: Set<String>): Boolean {
+    val unlockedSetLower = unlockedSet.map { it.lowercase().trim() }.toSet()
+    val objNameLower = obj.name.lowercase().trim()
+    val objKeyLower = obj.key.lowercase().trim()
+    
+    if (objKeyLower in unlockedSetLower || objNameLower in unlockedSetLower) return true
+    
+    // Mapeo de categorías generales y etiquetas específicas a claves únicas en la colección
+    for (u in unlockedSetLower) {
+        if (u.isNotEmpty() && (objNameLower.contains(u) || u.contains(objNameLower) || objKeyLower.contains(u) || u.contains(objKeyLower))) {
+            return true
+        }
+        
+        when {
+            // Papel y Cartón
+            u == "papel y cartón" || u == "cartón/papel" || u == "carton" || u == "papel" -> {
+                if (obj.key == "Box" || obj.key == "Paper" || obj.key == "Notebook") return true
+            }
+            // Vidrio
+            u == "vidrio" || u == "cristal" -> {
+                if (obj.key == "GlassBottle") return true
+            }
+            // Envases
+            u == "envases" || u == "envase plástico" || u == "envase" -> {
+                if (obj.key == "Bottle") return true
+            }
+            // Orgánico
+            u == "orgánico" || u == "organico" -> {
+                if (obj.key == "Food" || obj.key == "Banana") return true
+            }
+            // Latas
+            u == "lata" || u.contains("lata") -> {
+                if (obj.key == "SodaCan" || obj.key == "Can") return true
+            }
+            // Bolsa de plástico
+            u == "bolsa de plástico" || u == "bolsa" || u.contains("bolsa") -> {
+                if (obj.key == "PlasticBag" || obj.key == "SnackBag") return true
+            }
+            // Tapón/Tapa
+            u == "tapón/tapa" || u.contains("tapón") || u.contains("tapa") -> {
+                if (obj.key == "BottleCap") return true
+            }
+            // Dispositivos y Electrónica
+            u == "dispositivo electrónico" || u == "teléfono móvil" || u == "móvil / tablet" || u.contains("electrónico") || u.contains("móvil") || u.contains("movil") || u.contains("ordenador") || u.contains("pantalla") -> {
+                if (obj.key == "Electronics") return true
+            }
+            // Cables y cargadores
+            u == "cable/cableado" || u == "cargador/adaptador" || u.contains("cable") || u.contains("cargador") -> {
+                if (obj.key == "Toaster") return true
+            }
+            // Pilas
+            u == "pila/batería" || u.contains("pila") || u.contains("batería") || u.contains("bateria") -> {
+                if (obj.key == "Battery") return true
+            }
+            // Bombillas e Iluminación
+            u == "lámpara/iluminación" || u.contains("bombilla") || u.contains("iluminación") || u.contains("iluminacion") -> {
+                if (obj.key == "LightBulb") return true
+            }
+            // Ropa y calzado
+            u == "ropa/vestimenta" || u == "zapato/calzado" || u.contains("ropa") || u.contains("calzado") || u.contains("mochila") || u.contains("bolso") -> {
+                if (obj.key == "Clothes") return true
+            }
+            // Juguetes
+            u == "juguete" || u.contains("juguete") -> {
+                if (obj.key == "Toy") return true
+            }
+            // Bolígrafos
+            u == "bolígrafo/lápiz" || u.contains("bolígrafo") || u.contains("lápiz") || u.contains("tijeras") || u.contains("herramienta") -> {
+                if (obj.key == "Pen") return true
+            }
+        }
+    }
+    return false
+}
