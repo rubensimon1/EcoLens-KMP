@@ -9,13 +9,8 @@ import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
 
 /**
- * Gestor de puntos y escaneos con sincronización automática a Supabase.
- *
- * ### Cambios de migración Android → KMP
- * - `SharedPreferences` → `com.russhwolf:multiplatform-settings`
- * - `Log.d/e` → `println()`
- * - Eliminado parámetro `Context` de todos los métodos
- * - `System.currentTimeMillis()` → implícito en Supabase timestamps
+ * Gestor de puntos, rachas diarias y escaneos.
+ * Se encarga del almacenamiento local (Offline-First) y sincronización automática a Supabase.
  */
 object PointsManager {
 
