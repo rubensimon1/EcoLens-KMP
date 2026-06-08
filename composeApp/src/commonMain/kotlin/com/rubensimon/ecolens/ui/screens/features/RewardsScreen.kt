@@ -46,9 +46,11 @@ fun RewardsScreen(onBackClick: () -> Unit) {
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     var redeemedCoupons by remember { mutableStateOf<List<Coupon>>(emptyList()) }
     var userId by remember { mutableStateOf<String?>(null) }
+    var tiendasMap by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     
     LaunchedEffect(Unit) {
         isLoading = true
+        tiendasMap = UserRepository().getTiendasMap()
         coupons = UserRepository().getCouponsFromDb().ifEmpty { getSampleCoupons() }
         userId = UserRepository().getCurrentSessionUserId()
         val currentUserId = userId
@@ -66,7 +68,8 @@ fun RewardsScreen(onBackClick: () -> Unit) {
                     createdAt = r.fechaCanje,
                     description = r.codigo_qr ?: "",
                     redemptionId = r.id, // ID único de la tabla cupones_canjeados
-                    status = r.estado   // "activo" o "usado"
+                    status = r.estado,   // "activo" o "usado"
+                    tiendaId = r.tienda_id ?: matchingCoupon?.tiendaId
                 )
             }.filter { it.status == "activo" } // Solo mostramos los pendientes de usar
         }
@@ -185,6 +188,7 @@ fun RewardsScreen(onBackClick: () -> Unit) {
                             CouponCard(
                                 coupon = coupon,
                                 currentPoints = puntos,
+                                tiendasMap = tiendasMap,
                                 onRedeem = {
                                      if (puntos >= coupon.pointsCost && !isRedeeming) {
                                          scope.launch {
@@ -279,7 +283,12 @@ fun RewardsScreen(onBackClick: () -> Unit) {
                                             horizontalAlignment = Alignment.CenterHorizontally
                                         ) {
                                             Text(coupon.title, color = EcoColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                                            Text("Válido en tiendas colaboradoras", color = EcoColors.TextSecondary, fontSize = 12.sp)
+                                            val storeName = if (!coupon.tiendaId.isNullOrBlank()) {
+                                                tiendasMap[coupon.tiendaId] ?: "Tienda Colaboradora"
+                                            } else {
+                                                "Tienda Colaboradora"
+                                            }
+                                            Text("Válido en: $storeName", color = EcoColors.TextSecondary, fontSize = 12.sp)
                                             Spacer(modifier = Modifier.height(16.dp))
                                             val qrContent = if (coupon.description.startsWith("VAL-")) {
                                                 coupon.description
@@ -357,6 +366,7 @@ fun RewardsScreen(onBackClick: () -> Unit) {
 private fun CouponCard(
     coupon: Coupon,
     currentPoints: Int,
+    tiendasMap: Map<String, String> = emptyMap(),
     onRedeem: () -> Unit
 ) {
     val canRedeem = currentPoints >= coupon.pointsCost
@@ -379,6 +389,13 @@ private fun CouponCard(
             
             Column(modifier = Modifier.weight(1f)) {
                 Text(coupon.title, color = EcoColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                // Resolver el nombre de la tienda desde el mapa UUID → nombre
+                val storeName = if (!coupon.tiendaId.isNullOrBlank()) {
+                    tiendasMap[coupon.tiendaId] ?: "Tienda Colaboradora"
+                } else {
+                    "Tienda Colaboradora"
+                }
+                Text(storeName, color = EcoColors.TextSecondary, fontSize = 12.sp)
                 if (coupon.description.isNotBlank()) {
                     Text(coupon.description, color = EcoColors.TextSecondary, fontSize = 11.sp, maxLines = 1)
                 }
@@ -405,10 +422,10 @@ private fun CouponCard(
 }
 
 private fun getSampleCoupons() = listOf(
-    Coupon(id = "709f4f39-4658-49bb-be40-124a942f91df", title = "1 día de alquiler", description = "Bicicleta eléctrica incluida", pointsCost = 80, category = "transporte"),
-    Coupon(id = "835c679a-bf8d-4c53-b464-76f816e94cb5", title = "10% en accesorios", description = "Descuento en accesorios de móvil y PC", pointsCost = 200, category = "electrónica"),
-    Coupon(id = "b1e1b1e1-b1e1-b1e1-b1e1-b1e1b1e1b1e1", title = "10% descuento", description = "En cualquier libro", pointsCost = 60, category = "comercio"),
-    Coupon(id = "c1c1c1c1-c1c1-c1c1-c1c1-c1c1c1c1c1c1", title = "Pizza Mediana Gratis", description = "Cualquier ingrediente", pointsCost = 150, category = "restaurante"),
-    Coupon(id = "d1d1d1d1-d1d1-d1d1-d1d1-d1d1d1d1d1d1", title = "Café + Croissant", description = "Desayuno completo gratis", pointsCost = 50, category = "cafetería"),
-    Coupon(id = "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1", title = "5€ de descuento", description = "En compras superiores a 20€", pointsCost = 100, category = "supermercado"),
+    Coupon(id = "709f4f39-4658-49bb-be40-124a942f91df", tiendaId = "BiciMAD", title = "1 día de alquiler", description = "Bicicleta eléctrica incluida", pointsCost = 80, category = "transporte"),
+    Coupon(id = "835c679a-bf8d-4c53-b464-76f816e94cb5", tiendaId = "MediaMarkt", title = "10% en accesorios", description = "Descuento en accesorios de móvil y PC", pointsCost = 200, category = "electrónica"),
+    Coupon(id = "b1e1b1e1-b1e1-b1e1-b1e1-b1e1b1e1b1e1", tiendaId = "Casa del Libro", title = "10% descuento", description = "En cualquier libro", pointsCost = 60, category = "comercio"),
+    Coupon(id = "c1c1c1c1-c1c1-c1c1-c1c1-c1c1c1c1c1c1", tiendaId = "Domino's Pizza", title = "Pizza Mediana Gratis", description = "Cualquier ingrediente", pointsCost = 150, category = "restaurante"),
+    Coupon(id = "d1d1d1d1-d1d1-d1d1-d1d1-d1d1d1d1d1d1", tiendaId = "Starbucks", title = "Café + Croissant", description = "Desayuno completo gratis", pointsCost = 50, category = "cafetería"),
+    Coupon(id = "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1", tiendaId = "Carrefour", title = "5€ de descuento", description = "En compras superiores a 20€", pointsCost = 100, category = "supermercado"),
 )

@@ -39,33 +39,42 @@ fun CollectionScreen(onBackClick: () -> Unit) {
     val userRepo = remember { com.rubensimon.ecolens.data.repository.UserRepository() }
     val userId = remember { com.rubensimon.ecolens.utils.PointsManager.getUserId() }
     
-    val settings = remember { Settings() }
-    val unlockedRaw = remember { settings.getString("collection_unlocked", "") }
-    var unlockedSet by remember {
-        mutableStateOf(
-            if (unlockedRaw.isBlank()) emptySet<String>()
-            else unlockedRaw.split(",").toSet()
-        )
-    }
-    
+    var unlockedSet by remember { mutableStateOf<Set<Int>>(emptySet()) }
     var isLoading by remember { mutableStateOf(true) }
     var selectedObject by remember { mutableStateOf<EcoObject?>(null) }
     val sheetState = rememberModalBottomSheetState()
     var showSheet by remember { mutableStateOf(false) }
 
-    // Sincronizar con Supabase al entrar
     LaunchedEffect(userId) {
+        var userScans = emptyList<String>()
         if (userId.isNotEmpty()) {
             val history = userRepo.getUserHistory(userId)
             if (history.isNotEmpty()) {
-                val remoteUnlocked = history.map { it.object_name }.toSet()
-                // Combinar local con remoto
-                val finalSet = unlockedSet + remoteUnlocked
-                unlockedSet = finalSet
-                // Guardar localmente para rapidez la próxima vez
-                settings.putString("collection_unlocked", finalSet.joinToString(","))
+                userScans = history.map { it.object_name }
             }
         }
+        
+        val categoryCounts = mutableMapOf<String, Int>()
+        for (scan in userScans) {
+            val cat = getBaseCategoryForScan(scan)
+            if (cat != null) {
+                categoryCounts[cat] = categoryCounts.getOrElse(cat) { 0 } + 1
+            }
+        }
+        
+        val newUnlockedSet = mutableSetOf<Int>()
+        val currentCounts = mutableMapOf<String, Int>()
+        
+        for (obj in ecoObjects) {
+            val cat = obj.key
+            val currentRank = currentCounts.getOrElse(cat) { 0 } + 1
+            if (currentRank <= categoryCounts.getOrElse(cat) { 0 }) {
+                newUnlockedSet.add(obj.id)
+                currentCounts[cat] = currentRank
+            }
+        }
+        
+        unlockedSet = newUnlockedSet
         isLoading = false
     }
 
@@ -110,7 +119,7 @@ fun CollectionScreen(onBackClick: () -> Unit) {
                 )
             } else {
                 // Progreso
-                val unlockedCount = ecoObjects.count { checkIfUnlocked(it, unlockedSet) }
+                val unlockedCount = unlockedSet.size
                 val progress = if (ecoObjects.isEmpty()) 0f else unlockedCount.toFloat() / ecoObjects.size
                 GlassCard(
                     modifier = Modifier
@@ -162,7 +171,7 @@ fun CollectionScreen(onBackClick: () -> Unit) {
                     modifier = Modifier.widthIn(max = 800.dp)
                 ) {
                     items(ecoObjects) { obj ->
-                        val isUnlocked = checkIfUnlocked(obj, unlockedSet)
+                        val isUnlocked = unlockedSet.contains(obj.id)
                         CollectionCell(
                             emoji = obj.emoji,
                             name = if (isUnlocked) obj.name else "???",
@@ -347,6 +356,7 @@ private fun CollectionCell(
 
 // Catálogo completo de objetos reciclables
 private data class EcoObject(
+    val id: Int,
     val key: String, 
     val emoji: String, 
     val name: String, 
@@ -355,137 +365,35 @@ private data class EcoObject(
     val decompositionTime: String = ""
 )
 
-private val ecoObjects = listOf(
-    // --- CONTENEDOR AMARILLO (Envases, Plásticos y Metales) ---
-    EcoObject("Bottle", "🥤", "Botella de Plástico", "Amarillo", "El PET es 100% reciclable. Se usa para fabricar forros polares.", "450 años"),
-    EcoObject("Can", "🥫", "Lata de Conservas", "Amarillo", "El acero y el aluminio son infinitamente reciclables.", "10-100 años"),
-    EcoObject("SodaCan", "🥤", "Lata de Refresco", "Amarillo", "Reciclar una lata ahorra energía para tener una TV encendida 3h.", "10 años"),
-    EcoObject("TetraBrik", "🥛", "Brick de Leche", "Amarillo", "Están formados por cartón, plástico y aluminio.", "30 años"),
-    EcoObject("Shampoo", "🧴", "Bote de Champú", "Amarillo", "Asegúrate de vaciarlos completamente antes de reciclarlos.", "450 años"),
-    EcoObject("SnackBag", "🍿", "Bolsa de Snacks", "Amarillo", "Muchos envoltorios plateados también van al contenedor amarillo.", "100 años"),
-    EcoObject("Aluminum", "🌯", "Papel de Aluminio", "Amarillo", "Si está muy sucio de comida, mejor al gris, si no, al amarillo.", "400 años"),
-    EcoObject("Yogurt", "🍧", "Tarrina de Yogur", "Amarillo", "No es necesario lavarlos, solo vaciarlos bien.", "400 años"),
-    EcoObject("Styrofoam", "🍱", "Bandeja de Corcho", "Amarillo", "El poliestireno expandido es reciclable pero ocupa mucho volumen.", "500 años"),
-    EcoObject("PlasticBag", "🛍️", "Bolsa de Plástico", "Amarillo", "Las bolsas de plástico tardan siglos en degradarse en el mar.", "150 años"),
-    EcoObject("BottleCap", "🔵", "Tapón de Plástico", "Amarillo", "Existen campañas de recogida de tapones con fines solidarios.", "300 años"),
-    EcoObject("Spray", "💨", "Aerosol / Spray", "Amarillo", "Los botes de laca o desodorante van aquí siempre que estén vacíos.", "30 años"),
-    EcoObject("BeerCap", "🍺", "Chapa de Metal", "Amarillo", "Cualquier pequeña chapa o tapa metálica va al amarillo.", "100 años"),
-    EcoObject("PlasticFilm", "🎞️", "Film Transparente", "Amarillo", "El film de cocina es polietileno y es totalmente reciclable.", "100 años"),
-    EcoObject("CleanerBottle", "🧼", "Bote Detergente", "Amarillo", "Envases de limpieza del hogar suelen ser HDPE, muy valorado.", "450 años"),
-
-    // --- CONTENEDOR AZUL (Papel y Cartón) ---
-    EcoObject("Paper", "📰", "Periódico / Revista", "Azul", "Reciclar papel ahorra un 70% de agua comparado con usar madera.", "2-5 meses"),
-    EcoObject("Box", "📦", "Caja de Cartón", "Azul", "Desmonta las cajas para que ocupen menos espacio en el contenedor.", "1 año"),
-    EcoObject("EggCarton", "🥚", "Huevera de Cartón", "Azul", "El cartón puede reciclarse hasta 7 veces.", "3-5 meses"),
-    EcoObject("Mail", "✉️", "Sobres y Cartas", "Azul", "Recuerda quitar las ventanillas de plástico de los sobres.", "2 meses"),
-    EcoObject("PizzaBox", "🍕", "Caja de Pizza", "Azul", "Solo si está limpia. Si tiene mucha grasa, debe ir al contenedor gris.", "4 meses"),
-    EcoObject("Book", "📚", "Libros Viejos", "Azul", "Si están en buen estado, ¡mejor dónalos! Si no, al contenedor azul.", "1 año"),
-    EcoObject("FlourBag", "🍞", "Bolsa de Harina", "Azul", "Las bolsas de papel de harina o azúcar son reciclables aquí.", "2 meses"),
-    EcoObject("Notebook", "📓", "Cuaderno", "Azul", "Los cuadernos tienen papel reciclable, pero recuerda quitar la espiral metálica.", "1 año"),
-
-    // --- CONTENEDOR VERDE (Vidrio) ---
-    EcoObject("GlassBottle", "🍾", "Botella de Vidrio", "Verde", "El vidrio nunca pierde sus propiedades al reciclarse.", "4000 años"),
-    EcoObject("JamJar", "🍯", "Tarro de Mermelada", "Verde", "Quita las tapas (van al amarillo) antes de tirar el tarro al verde.", "4000 años"),
-    EcoObject("Perfume", "💎", "Frasco de Perfume", "Verde", "El cristal de los espejos NO va aquí, solo vidrio de envase.", "4000 años"),
-    EcoObject("WineBottle", "🍷", "Botella de Vino", "Verde", "Reciclar 3 botellas de vidrio ahorra energía para lavar toda la ropa de un día.", "4000 años"),
-
-    // --- CONTENEDOR MARRÓN (Orgánico) ---
-    EcoObject("Food", "🍎", "Restos de Comida", "Orgánico", "Con ellos se fabrica compost para agricultura y jardinería.", "1-6 meses"),
-    EcoObject("Coffee", "☕", "Posos de Café", "Orgánico", "Son excelentes fertilizantes naturales.", "1 mes"),
-    EcoObject("Cork", "🍷", "Tapón de Corcho", "Orgánico", "El corcho natural es biodegradable y compostable.", "50 años"),
-    EcoObject("TeaBag", "🍵", "Bolsa de Té", "Orgánico", "La mayoría son biodegradables, pero comprueba que no tengan grapas.", "2 meses"),
-    EcoObject("Napkin", "🧻", "Servilleta Sucia", "Orgánico", "Si tiene restos de comida, va al orgánico. Si está limpia, al azul.", "1 mes"),
-    EcoObject("Banana", "🍌", "Plátano", "Orgánico", "La piel de plátano es excelente para hacer compost de calidad.", "2-10 días"),
-
-    // --- ESPECIALES / PUNTO LIMPIO / OTROS ---
-    EcoObject("Battery", "🔋", "Pilas y Baterías", "Especial", "Altamente contaminantes. Una sola pila de botón contamina 600k L de agua.", "500 años"),
-    EcoObject("Electronics", "📱", "Móvil / Tablet", "RAEE", "Contienen minerales raros como el coltán que deben recuperarse.", "Indefinido"),
-    EcoObject("Oil", "🛢️", "Aceite Usado", "Especial", "Nunca lo tires por el fregadero. Con él se fabrica biodiésel.", "Indefinido"),
-    EcoObject("LightBulb", "💡", "Bombilla / LED", "Especial", "Las bombillas viejas tienen mercurio y gases pesados.", "Indefinido"),
-    EcoObject("Clothes", "👕", "Ropa Usada", "Especial", "La industria textil es de las más contaminantes del mundo.", "40-200 años"),
-    EcoObject("Medicine", "💊", "Medicamentos", "SIGRE", "Lleva los envases y restos a la farmacia (Punto SIGRE).", "Indefinido"),
-    EcoObject("Capsule", "☕", "Cápsula de Café", "Especial", "Muchas marcas tienen puntos de recogida especiales para aluminio/plástico.", "200 años"),
-    EcoObject("XRay", "🩻", "Radiografía", "Punto Limpio", "Contienen sales de plata que son muy valiosas y contaminantes.", "Indefinido"),
-    EcoObject("Paint", "🎨", "Bote de Pintura", "Punto Limpio", "Los restos químicos deben tratarse como residuos peligrosos.", "Indefinido"),
-    EcoObject("Toaster", "🍞", "Tostadora / Batidora", "RAEE", "Cualquier aparato con cable o pilas debe ir al punto limpio.", "Indefinido"),
-    EcoObject("CD", "💿", "CD / DVD", "Punto Limpio", "Están hechos de policarbonato, un plástico muy difícil de degradar.", "Indefinido"),
-    EcoObject("Toy", "🧸", "Juguete Roto", "Punto Limpio", "Si tienen electrónica, al RAEE. Si son solo plástico duro, al Punto Limpio.", "500 años"),
-    EcoObject("Thermometer", "🌡️", "Termómetro", "Especial", "Los antiguos de mercurio son extremadamente peligrosos si se rompen.", "Indefinido"),
-    EcoObject("Fluorescent", "🔦", "Fluorescente", "Especial", "Contienen vapor de mercurio y deben reciclarse con cuidado.", "Indefinido"),
-    EcoObject("Pen", "🖊️", "Bolígrafo/Lápiz", "Punto Limpio", "Los bolígrafos están hechos de múltiples plásticos y metales difíciles de separar.", "100 años"),
+private val baseObjects = listOf(
+    EcoObject(0, "Envases", "🥤", "Envases", "Amarillo", "Los envases de plástico, latas y briks van al contenedor amarillo.", "10-500 años"),
+    EcoObject(0, "Papel y Cartón", "📦", "Papel y Cartón", "Azul", "Reciclar papel ahorra agua y salva árboles.", "2-12 meses"),
+    EcoObject(0, "Vidrio", "🍾", "Vidrio", "Verde", "El vidrio se puede reciclar infinitas veces sin perder sus propiedades.", "4000 años"),
+    EcoObject(0, "Orgánico", "🍎", "Orgánico", "Marrón", "Los restos de comida se usan para hacer compost y abonar la tierra.", "1-6 meses")
 )
 
-private fun checkIfUnlocked(obj: EcoObject, unlockedSet: Set<String>): Boolean {
-    val unlockedSetLower = unlockedSet.map { it.lowercase().trim() }.toSet()
-    val objNameLower = obj.name.lowercase().trim()
-    val objKeyLower = obj.key.lowercase().trim()
-    
-    if (objKeyLower in unlockedSetLower || objNameLower in unlockedSetLower) return true
-    
-    // Mapeo de categorías generales y etiquetas específicas a claves únicas en la colección
-    for (u in unlockedSetLower) {
-        if (u.isNotEmpty() && (objNameLower.contains(u) || u.contains(objNameLower) || objKeyLower.contains(u) || u.contains(objKeyLower))) {
-            return true
-        }
-        
-        when {
-            // Papel y Cartón
-            u == "papel y cartón" || u == "cartón/papel" || u == "carton" || u == "papel" -> {
-                if (obj.key == "Box" || obj.key == "Paper" || obj.key == "Notebook") return true
-            }
-            // Vidrio
-            u == "vidrio" || u == "cristal" -> {
-                if (obj.key == "GlassBottle") return true
-            }
-            // Envases
-            u == "envases" || u == "envase plástico" || u == "envase" -> {
-                if (obj.key == "Bottle") return true
-            }
-            // Orgánico
-            u == "orgánico" || u == "organico" -> {
-                if (obj.key == "Food" || obj.key == "Banana") return true
-            }
-            // Latas
-            u == "lata" || u.contains("lata") -> {
-                if (obj.key == "SodaCan" || obj.key == "Can") return true
-            }
-            // Bolsa de plástico
-            u == "bolsa de plástico" || u == "bolsa" || u.contains("bolsa") -> {
-                if (obj.key == "PlasticBag" || obj.key == "SnackBag") return true
-            }
-            // Tapón/Tapa
-            u == "tapón/tapa" || u.contains("tapón") || u.contains("tapa") -> {
-                if (obj.key == "BottleCap") return true
-            }
-            // Dispositivos y Electrónica
-            u == "dispositivo electrónico" || u == "teléfono móvil" || u == "móvil / tablet" || u.contains("electrónico") || u.contains("móvil") || u.contains("movil") || u.contains("ordenador") || u.contains("pantalla") -> {
-                if (obj.key == "Electronics") return true
-            }
-            // Cables y cargadores
-            u == "cable/cableado" || u == "cargador/adaptador" || u.contains("cable") || u.contains("cargador") -> {
-                if (obj.key == "Toaster") return true
-            }
-            // Pilas
-            u == "pila/batería" || u.contains("pila") || u.contains("batería") || u.contains("bateria") -> {
-                if (obj.key == "Battery") return true
-            }
-            // Bombillas e Iluminación
-            u == "lámpara/iluminación" || u.contains("bombilla") || u.contains("iluminación") || u.contains("iluminacion") -> {
-                if (obj.key == "LightBulb") return true
-            }
-            // Ropa y calzado
-            u == "ropa/vestimenta" || u == "zapato/calzado" || u.contains("ropa") || u.contains("calzado") || u.contains("mochila") || u.contains("bolso") -> {
-                if (obj.key == "Clothes") return true
-            }
-            // Juguetes
-            u == "juguete" || u.contains("juguete") -> {
-                if (obj.key == "Toy") return true
-            }
-            // Bolígrafos
-            u == "bolígrafo/lápiz" || u.contains("bolígrafo") || u.contains("lápiz") || u.contains("tijeras") || u.contains("herramienta") -> {
-                if (obj.key == "Pen") return true
-            }
+private val ecoObjects = buildList {
+    var idCounter = 1
+    for (i in 1..13) {
+        baseObjects.forEach { base ->
+            add(base.copy(id = idCounter++, name = "${base.name} #$i"))
         }
     }
-    return false
+}
+
+private fun getBaseCategoryForScan(scan: String): String? {
+    val s = scan.lowercase().trim()
+    if (s.isEmpty()) return null
+    if (s.contains("papel") || s.contains("cartón") || s.contains("carton")) return "Papel y Cartón"
+    if (s.contains("vidrio") || s.contains("cristal")) return "Vidrio"
+    if (s.contains("envase") || s.contains("plástico") || s.contains("lata") || s.contains("botella") || s.contains("plastico")) return "Envases"
+    if (s.contains("orgánico") || s.contains("organico") || s.contains("comida") || s.contains("fruta") || s.contains("manzana") || s.contains("plátano")) return "Orgánico"
+    
+    // Mapeos exactos por si acaso
+    when (s) {
+        "envases" -> return "Envases"
+        "vidrio" -> return "Vidrio"
+        "orgánico", "organico" -> return "Orgánico"
+    }
+    return null
 }

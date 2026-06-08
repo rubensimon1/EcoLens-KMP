@@ -9,6 +9,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -86,10 +88,19 @@ fun LoginScreen(
         targetValue = if (authState == AuthState.Welcome) 0.90f else 0.65f,
         animationSpec = tween(durationMillis = 800)
     )
+    // Detectar si el teclado (IME) está visible
+    val isKeyboardOpen = WindowInsets.ime.asPaddingValues().calculateBottomPadding() > 0.dp
+
     val formTopSpace by animateFloatAsState(
-        targetValue = if (authState == AuthState.Welcome) 0.28f else 0.32f,
-        animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing)
+        targetValue = when {
+            isKeyboardOpen -> 0.05f
+            authState == AuthState.Welcome -> 0.28f
+            else -> 0.32f
+        },
+        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
     )
+
+    val listState = rememberLazyListState()
 
     BoxWithConstraints(
         modifier = modifier.fillMaxSize().background(darkGreenBg)
@@ -126,7 +137,8 @@ fun LoginScreen(
         }
 
         LazyColumn(
-            modifier = Modifier.fillMaxSize().navigationBarsPadding(),
+            state = listState,
+            modifier = Modifier.fillMaxSize().navigationBarsPadding().imePadding(),
             contentPadding = PaddingValues(horizontal = 40.dp)
         ) {
             item {
@@ -189,11 +201,7 @@ fun LoginScreen(
                                     }
 
                                     if (mode == "signin") {
-                                        Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 32.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Checkbox(checked = rememberMe, onCheckedChange = { rememberMe = it }, colors = CheckboxDefaults.colors(checkedColor = vividTurquoise))
-                                                Text("Remember Me", fontSize = 12.sp, color = oledBlack, fontWeight = FontWeight.Bold)
-                                            }
+                                        Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 32.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
                                             Text("Forgot Password?", fontSize = 12.sp, color = vividTurquoise, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { isForgotPasswordMode = true; errorMessage = "" })
                                         }
                                     } else {
@@ -248,8 +256,7 @@ fun LoginScreen(
                 }
             }
             item {
-                Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.ime))
-                Spacer(modifier = Modifier.height(100.dp))
+                Spacer(modifier = Modifier.height(200.dp))
             }
         }
     }

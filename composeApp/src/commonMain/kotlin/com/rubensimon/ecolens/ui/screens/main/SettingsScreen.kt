@@ -42,7 +42,7 @@ fun SettingsScreen(
     val settings = remember { Settings() }
 
     // Estado del tema
-    var isDarkMode by remember { mutableStateOf(settings.getBoolean("dark_mode", true)) }
+    var isDarkMode by remember { mutableStateOf(EcoColors.isDark) }
     // Audio
     var musicEnabled by remember { mutableStateOf(settings.getBoolean("audio_music_enabled", true)) }
     var effectsEnabled by remember { mutableStateOf(settings.getBoolean("audio_effects_enabled", true)) }
@@ -495,7 +495,9 @@ fun SettingsScreen(
             SectionHeader("⚖️ Privacidad y Legal")
             GlassCard(modifier = Modifier.fillMaxWidth()) {
                 InteractiveRow(Icons.Default.LocationOn, Color(0xFF34C759), "Permisos de Ubicación") { 
-                    statusMessage = "📍 Gestionando permisos en el sistema..."
+                    infoTitle = "📍 Ubicación"
+                    infoText = "Los permisos de ubicación se solicitan automáticamente al abrir el Mapa. Si los has denegado, ve a los Ajustes de tu dispositivo para activarlos."
+                    showInfoDialog = true
                 }
                 EcoDivider(modifier = Modifier.padding(vertical = 8.dp))
                 InteractiveRow(Icons.Default.Gavel, Color(0xFF8E8E93), "Términos y Condiciones") { 
