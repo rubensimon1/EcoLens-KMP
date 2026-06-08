@@ -597,8 +597,18 @@ fun MenuScreen(
         }
 
         // ── BANNER SIN CONEXIÓN (NUEVO) ──────────────────────────
+        var showOfflineBanner by remember { mutableStateOf(false) }
+        LaunchedEffect(isOnline) {
+            if (!isOnline) {
+                showOfflineBanner = true
+                kotlinx.coroutines.delay(3000)
+                showOfflineBanner = false
+            } else {
+                showOfflineBanner = false
+            }
+        }
         AnimatedVisibility(
-            visible = !isOnline,
+            visible = showOfflineBanner,
             enter = slideInVertically { -it },
             exit = slideOutVertically { -it },
             modifier = Modifier.align(Alignment.TopCenter).padding(top = 12.dp)

@@ -261,6 +261,21 @@ class UserRepository {
     }
 
     /**
+     * Recupera el mapa de tiendas colaboradoras (UUID → nombre).
+     */
+    suspend fun getTiendasMap(): Map<String, String> {
+        return try {
+            val tiendas = client.from("tiendas")
+                .select()
+                .decodeList<com.rubensimon.ecolens.data.models.items.TiendaModel>()
+            tiendas.associate { it.id to it.nombre }
+        } catch (e: Exception) {
+            println("[UserRepository] Error getTiendasMap: ${e.message}")
+            emptyMap()
+        }
+    }
+
+    /**
      * Registra el canje de un cupón por parte de un usuario.
      *
      * Usa `.select()` para que Supabase devuelva la fila insertada con el `id` generado

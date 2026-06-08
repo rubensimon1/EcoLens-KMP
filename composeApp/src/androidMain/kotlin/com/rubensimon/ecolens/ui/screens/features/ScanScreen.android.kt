@@ -553,11 +553,26 @@ actual fun PlatformCameraView(
                     } else if (lastDetectedObject == "Buscando material...") {
                         // Nada detectado aún
                         Text(
-                            text = "📷 Buscando material...",
+                            text = if (isSddr) "📲 Apunta al código QR SDDR" else "📷 Buscando material...",
                             color = Color(0xFFBDBDBD),
                             fontWeight = FontWeight.Medium,
                             textAlign = TextAlign.Center,
                             fontSize = 16.sp
+                        )
+                    } else if (isSddr && lastDetectedObject == "Apunta al código QR") {
+                        // En modo SDDR esperando QR
+                        Text(
+                            text = "📲 Apunta al código QR SDDR",
+                            color = Color(0xFF64B5F6),
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            fontSize = 18.sp
+                        )
+                        Text(
+                            text = detectedMessage,
+                            color = EcoColors.TextPrimary.copy(alpha = 0.65f),
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center
                         )
                     } else {
                         // Objeto detectado pero NO reciclable — mostrar nombre
@@ -667,6 +682,16 @@ actual fun PlatformCameraView(
                     if (capturedBitmap == null || capturedBitmap.isRecycled) {
                         resultMessage = "❌ No veo la cámara lista"
                         isAnalyzingWithGemini = false
+                        return@GlassButton
+                    }
+
+                    // ── MODO SDDR: simular canje de QR, siempre aceptado ─────────────
+                    if (isSddr) {
+                        resultMessage = "✅ Vale SDDR canjeado\n¡+0.10€ a tu saldo SDDR!"
+                        guardarEscaneo(scope, isSddr, "Vale SDDR", 50)
+                        PlatformAudio.playSuccess()
+                        onScanComplete("Vale SDDR", 50)
+                        if (!capturedBitmap.isRecycled) capturedBitmap.recycle()
                         return@GlassButton
                     }
 
@@ -838,12 +863,14 @@ private fun analyzeFrame(
 ) {
     val inputImage = InputImage.fromBitmap(croppedBitmap, 0)
 
-    fun runPipelineBase() {
-        if (!isSddr) {
-            ejecutarModeloBase(inputImage, baseLabeler, isSddr, onResult, onComplete)
-            return
-        }
+    // En modo SDDR nunca clasificamos objetos con IA: solo buscamos QR
+    if (isSddr) {
         runBarcodeThenBase(inputImage, barcodeScanner, baseLabeler, isSddr, onComplete, onResult)
+        return
+    }
+
+    fun runPipelineBase() {
+        ejecutarModeloBase(inputImage, baseLabeler, isSddr, onResult, onComplete)
     }
 
     fun emitCustomResult(nombre: String, conf: Float, rawInfo: String) {
@@ -925,11 +952,13 @@ private fun runBarcodeThenBase(
                 }
             }
             
-            // Si es SDDR pero no se leyó QR, clasificar el envase directamente
-            ejecutarModeloBase(inputImage, baseLabeler, isSddr, onResult, onComplete)
+            // En SDDR si no hay QR, mostrar aviso de que apunte al código (no clasificar objeto)
+            onResult("Apunta al código QR", 0f, false, 0, "Centra el código QR SDDR en el recuadro", "[SDDR] esperando QR")
+            onComplete()
         }
         .addOnFailureListener {
-            ejecutarModeloBase(inputImage, baseLabeler, isSddr, onResult, onComplete)
+            onResult("Apunta al código QR", 0f, false, 0, "Centra el código QR SDDR en el recuadro", "[SDDR] error lector")
+            onComplete()
         }
 }
 
@@ -1145,158 +1174,38 @@ private fun esExcluido(text: String): Boolean {
 private fun traducirEtiqueta(text: String): String {
     val t = text.lowercase()
     return when {
-        t.contains("banana") -> "Plátano"
-        t.contains("notebook") && !t.contains("computer") -> "Cuaderno"
-        t.contains("plastic bottle") || (t.contains("bottle") && t.contains("plastic")) -> "Botella de Plástico"
-        t.contains("glass bottle") -> "Botella de Vidrio"
-        t.contains("wine bottle") -> "Botella de Vino"
-        t.contains("bottle") || t.contains("water") || t.contains("liquid") || t.contains("jug") -> "Botella de Plástico"
-        t.contains("soda") || t.contains("beer") -> "Lata de Refresco"
-        t.contains("tin can") || t.contains("can") || t.contains("tin") || t.contains("aluminum")
-                || t.contains("aluminium") -> "Lata de Conservas"
-        t.contains("drinkware") || t.contains("cup") || t.contains("tableware") -> "Vaso/Taza"
-        t.contains("glass jar") || t.contains("jar") -> "Tarro de Mermelada"
-        t.contains("perfume") -> "Frasco de Perfume"
-        t.contains("glass") -> "Botella de Vidrio"
-        t.contains("newspaper") || t.contains("magazine") -> "Periódico / Revista"
-        t.contains("egg carton") -> "Huevera de Cartón"
-        t.contains("envelope") || t.contains("mail") || t.contains("letter") -> "Sobres y Cartas"
-        t.contains("pizza box") -> "Caja de Pizza"
-        t.contains("flour bag") -> "Bolsa de Harina"
-        t.contains("book") || t.contains("novel") || t.contains("paperback") -> "Libros Viejos"
-        t.contains("paper") -> "Periódico / Revista"
-        t.contains("cardboard") || t.contains("box") -> "Caja de Cartón"
-        t.contains("carton") -> "Brick de Leche"
-        t.contains("shampoo") || t.contains("soap bottle") || t.contains("soap") -> "Bote de Champú"
-        t.contains("snack") || t.contains("chips") || t.contains("packet") || t.contains("wrapper") || t.contains("cookie") -> "Bolsa de Snacks"
-        t.contains("aluminum foil") -> "Papel de Aluminio"
-        t.contains("yogurt") || t.contains("yoghurt") -> "Tarrina de Yogur"
-        t.contains("styrofoam") || t.contains("polystyrene") -> "Bandeja de Corcho"
-        t.contains("plastic bag") || t.contains("bag") -> "Bolsa de Plástico"
-        t.contains("cap") || t.contains("lid") || t.contains("bottle cap") -> "Tapón de Plástico"
-        t.contains("spray") || t.contains("aerosol") -> "Aerosol / Spray"
-        t.contains("crown cap") || t.contains("beer cap") -> "Chapa de Metal"
-        t.contains("film") || t.contains("cling wrap") -> "Film Transparente"
-        t.contains("detergent") || t.contains("cleaner bottle") -> "Bote Detergente"
-        t.contains("beverage") || t.contains("drink") || t.contains("juice") -> "Brick de Leche"
-        t.contains("cylinder") -> "Bote de Champú"
-        t.contains("waste container") || t.contains("recycling") -> "Contenedor de Reciclaje"
-        t.contains("product") || t.contains("material property") -> "Envase/Producto"
-        t.contains("coffee") -> "Posos de Café"
-        t.contains("cork") -> "Tapón de Corcho"
-        t.contains("tea") -> "Bolsa de Té"
-        t.contains("napkin") || t.contains("tissue") || t.contains("paper towel") -> "Servilleta Sucia"
-        t.contains("food") || t.contains("fruit") || t.contains("vegetable") || t.contains("bread") || t.contains("organic") -> "Restos de Comida"
-        else -> "Envase Reciclable"
+        t.contains("bottle") || t.contains("can") || t.contains("plastic") || t.contains("aluminum") || 
+        t.contains("tin") || t.contains("bag") || t.contains("cup") || t.contains("foil") ||
+        t.contains("cap") || t.contains("lid") || t.contains("wrapper") || t.contains("spray") -> "Envases"
+        
+        t.contains("paper") || t.contains("cardboard") || t.contains("box") || t.contains("carton") || 
+        t.contains("newspaper") || t.contains("magazine") || t.contains("book") || t.contains("envelope") -> "Papel y Cartón"
+        
+        t.contains("glass") || t.contains("jar") || t.contains("wine") || t.contains("perfume") -> "Vidrio"
+        
+        t.contains("food") || t.contains("fruit") || t.contains("vegetable") || t.contains("banana") || 
+        t.contains("apple") || t.contains("orange") || t.contains("coffee") || t.contains("organic") ||
+        t.contains("bread") || t.contains("meat") || t.contains("plant") -> "Orgánico"
+        
+        else -> "No reciclable"
     }
 }
 
 /** Traduce etiqueta de objeto NO reciclable para mostrarlo en español. */
 private fun traducirNoReciclable(text: String): String {
-    val t = text.lowercase()
-    return when {
-        t.contains("banana") -> "Plátano"
-        t.contains("notebook") && !t.contains("computer") -> "Cuaderno"
-        t.contains("battery") -> "Pilas y Baterías"
-        t.contains("phone") || t.contains("mobile") || t.contains("smartphone") || t.contains("tablet") -> "Móvil / Tablet"
-        t.contains("oil") -> "Aceite Usado"
-        t.contains("lamp") || t.contains("light") || t.contains("bulb") -> "Bombilla / LED"
-        t.contains("clothing") || t.contains("wear") || t.contains("shirt") || t.contains("pants") || t.contains("coat") || t.contains("jacket") -> "Ropa Usada"
-        t.contains("medicine") || t.contains("pill") || t.contains("drug") -> "Medicamentos"
-        t.contains("capsule") || t.contains("coffee capsule") -> "Cápsula de Café"
-        t.contains("x-ray") || t.contains("radiography") -> "Radiografía"
-        t.contains("paint") -> "Bote de Pintura"
-        t.contains("toaster") || t.contains("blender") || t.contains("appliance") || t.contains("hardware") -> "Tostadora / Batidora"
-        t.contains("cd") || t.contains("dvd") -> "CD / DVD"
-        t.contains("toy") || t.contains("doll") -> "Juguete Roto"
-        t.contains("thermometer") -> "Termómetro"
-        t.contains("fluorescent") -> "Fluorescente"
-        t.contains("pen") || t.contains("pencil") || t.contains("marker") -> "Bolígrafo/Lápiz"
-        
-        // Electrónica y Conectores
-        t.contains("cable") || t.contains("wire") || t.contains("cord") -> "Tostadora / Batidora"
-        t.contains("charger") || t.contains("adapter") || t.contains("plug") -> "Tostadora / Batidora"
-        t.contains("electronic") || t.contains("device") || t.contains("gadget") -> "Móvil / Tablet"
-        t.contains("computer") || t.contains("laptop") -> "Móvil / Tablet"
-        t.contains("television") || t.contains("monitor") || t.contains("screen") -> "Móvil / Tablet"
-        t.contains("camera") || t.contains("lens") -> "Móvil / Tablet"
-        t.contains("headphone") || t.contains("earphone") || t.contains("headset") -> "Móvil / Tablet"
-        t.contains("speaker") || t.contains("audio") -> "Móvil / Tablet"
-        t.contains("clock") || t.contains("watch") -> "Móvil / Tablet"
-
-        // Ropa y Accesorios Personales
-        t.contains("shoe") || t.contains("footwear") || t.contains("boot") || t.contains("sneakers") || t.contains("slipper") -> "Ropa Usada"
-        t.contains("glasses") || t.contains("sunglasses") || t.contains("eyewear") -> "Ropa Usada"
-        t.contains("backpack") || t.contains("handbag") || t.contains("luggage") || t.contains("suitcase") || t.contains("bag") -> "Ropa Usada"
-        t.contains("wallet") || t.contains("purse") -> "Ropa Usada"
-        t.contains("jewelry") || t.contains("ring") || t.contains("necklace") -> "Ropa Usada"
-
-        // Objetos de Hogar / Oficina
-        t.contains("table") || t.contains("desk") || t.contains("shelf") || t.contains("cabinet") -> "Juguete Roto"
-        t.contains("chair") || t.contains("stool") || t.contains("sofa") || t.contains("couch") || t.contains("furniture") -> "Juguete Roto"
-        t.contains("bed") || t.contains("pillow") || t.contains("blanket") -> "Ropa Usada"
-        t.contains("mirror") -> "Juguete Roto"
-        t.contains("scissors") -> "Bolígrafo/Lápiz"
-        t.contains("key") -> "Bolígrafo/Lápiz"
-        t.contains("coin") || t.contains("money") -> "Bolígrafo/Lápiz"
-        t.contains("tool") || t.contains("hammer") || t.contains("screwdriver") -> "Bolígrafo/Lápiz"
-
-        // Cocina (no envases)
-        t.contains("plate") || t.contains("dish") || t.contains("bowl") -> "Juguete Roto"
-        t.contains("fork") || t.contains("knife") || t.contains("spoon") || t.contains("cutlery") -> "Bolígrafo/Lápiz"
-        t.contains("cup") || t.contains("mug") || t.contains("glass") -> "Vaso/Taza"
-
-        // Naturaleza y Seres Vivos
-        t.contains("person") || t.contains("face") || t.contains("human") || t.contains("hand") || t.contains("finger") -> "Persona"
-        t.contains("plant") || t.contains("flower") || t.contains("tree") || t.contains("grass") || t.contains("leaf") -> "Restos de Comida"
-        contienePalabraCompleta(t, "animal") || contienePalabraCompleta(t, "dog") ||
-                contienePalabraCompleta(t, "cat") || contienePalabraCompleta(t, "pet") ||
-                contienePalabraCompleta(t, "bird") -> "Mascota/Animal"
-        t.contains("banana") || t.contains("plantain") -> "Plátano"
-        t.contains("food") || t.contains("fruit") || t.contains("vegetable") || t.contains("bread") ||
-                t.contains("apple") || t.contains("orange") || t.contains("lemon") || t.contains("citrus") ||
-                t.contains("tomato") || t.contains("potato") || t.contains("carrot") || t.contains("grape") ||
-                t.contains("berry") || t.contains("melon") || t.contains("pineapple") || t.contains("pear") ||
-                t.contains("peach") || t.contains("avocado") || t.contains("cucumber") || t.contains("broccoli") ||
-                t.contains("salad") || t.contains("produce") || t.contains("bakery") || t.contains("grocery") -> "Restos de Comida"
-        t.contains("sky") || t.contains("cloud") || t.contains("sun") || t.contains("moon") -> "Cielo/Naturaleza"
-
-        // Estructuras e Información Visual
-        t.contains("wall") || t.contains("floor") || t.contains("ceiling") || t.contains("window") || t.contains("door") || t.contains("building") -> "Estructura"
-        t.contains("pattern") || t.contains("texture") || t.contains("design") -> "Patrón/Textura"
-        t.contains("text") || t.contains("font") || t.contains("number") || t.contains("letter") || t.contains("logo") -> "Texto"
-        t.contains("book") || t.contains("novel") || t.contains("magazine") -> "Libros Viejos"
-
-        // Materiales y otros
-        t.contains("leather") -> "Cuero"
-        t.contains("wood") || t.contains("wooden") -> "Madera"
-        t.contains("metal") || t.contains("metallic") -> "Metal"
-        t.contains("plastic") -> "Plástico"
-        t.contains("glass") -> "Vidrio"
-        t.contains("fabric") || t.contains("textile") -> "Tela"
-        
-        else -> text.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() } // Formato Capitalizado
-    }
+    return "No reciclable"
 }
 
 /** Envases (amarillo/azul/verde) — no orgánico ni RAEE. */
 private fun esEnvaseReciclableEcoDex(label: String): Boolean {
     if (esResiduoOrganicoEcoDex(label) || esObjetoEspecial(label)) return false
     val t = label.lowercase()
-    return t.contains("envases") || t.contains("papel y cartón") || t.contains("papel y carton") || t.contains("vidrio") ||
-        t.contains("botella") || t.contains("lata") || t.contains("brick") ||
-        t.contains("bote") || t.contains("bolsa") || t.contains("caja") || t.contains("cartón") ||
-        t.contains("carton") || t.contains("periódico") || t.contains("periodico") ||
-        t.contains("tarro") || t.contains("frasco") || t.contains("aerosol") || t.contains("film") ||
-        t.contains("tarrina") || t.contains("tapón") || t.contains("tapon") || t.contains("chapa")
+    return t.contains("envases") || t.contains("papel y cartón") || t.contains("papel y carton") || t.contains("vidrio")
 }
 
 private fun esResiduoOrganicoEcoDex(label: String): Boolean {
     val t = label.lowercase()
-    return t.contains("orgánico") || t.contains("organico") ||
-        t.contains("plátano") || t.contains("platano") || t.contains("restos de comida") ||
-        t.contains("posos") || t.contains("bolsa de té") || t.contains("bolsa de te") ||
-        t.contains("servilleta") || t.contains("tapón de corcho") || t.contains("tapon de corcho")
+    return t.contains("orgánico") || t.contains("organico")
 }
 
 private fun puedeRegistrarEscaneo(label: String, confidence: Float, points: Int): Boolean {
@@ -1319,56 +1228,7 @@ private fun estaListoParaEscanear(
 private fun esObjetoValidoEcoDex(label: String): Boolean {
     val t = label.lowercase()
     return t.contains("envases") || t.contains("papel y cartón") || t.contains("papel y carton") ||
-           t.contains("vidrio") || t.contains("orgánico") || t.contains("organico") ||
-           t.contains("botella de plástico") || t.contains("botella de plastico") ||
-           t.contains("lata de conservas") ||
-           t.contains("lata de refresco") ||
-           t.contains("brick de leche") ||
-           t.contains("bote de champú") || t.contains("bote de champu") ||
-           t.contains("bolsa de snacks") ||
-           t.contains("papel de aluminio") ||
-           t.contains("tarrina de yogur") ||
-           t.contains("bandeja de corcho") ||
-           t.contains("bolsa de plástico") || t.contains("bolsa de plastico") ||
-           t.contains("tapón de plástico") || t.contains("tapon de plastico") ||
-           t.contains("aerosol / spray") ||
-           t.contains("chapa de metal") ||
-           t.contains("film transparente") ||
-           t.contains("bote detergente") ||
-           t.contains("periódico / revista") || t.contains("periodico / revista") ||
-           t.contains("caja de cartón") || t.contains("caja de carton") ||
-           t.contains("huevera de cartón") || t.contains("huevera de carton") ||
-           t.contains("sobres y cartas") ||
-           t.contains("caja de pizza") ||
-           t.contains("libros viejos") ||
-           t.contains("bolsa de harina") ||
-           t.contains("cuaderno") ||
-           t.contains("botella de vidrio") ||
-           t.contains("tarro de mermelada") ||
-           t.contains("frasco de perfume") ||
-           t.contains("botella de vino") ||
-           t.contains("restos de comida") ||
-           t.contains("posos de café") || t.contains("posos de cafe") ||
-           t.contains("tapón de corcho") || t.contains("tapon de corcho") ||
-           t.contains("bolsa de té") || t.contains("bolsa de te") ||
-           t.contains("servilleta sucia") ||
-           t.contains("plátano") || t.contains("platano") ||
-           t.contains("pilas y baterías") || t.contains("pilas y baterias") ||
-           t.contains("móvil / tablet") || t.contains("movil / tablet") ||
-           t.contains("aceite usado") ||
-           t.contains("bombilla / led") ||
-           t.contains("ropa usada") ||
-           t.contains("medicamentos") ||
-           t.contains("cápsula de café") || t.contains("capsula de cafe") ||
-           t.contains("radiografía") || t.contains("radiografia") ||
-           t.contains("bote de pintura") ||
-           t.contains("tostadora / batidora") ||
-           t.contains("cd / dvd") ||
-           t.contains("juguete roto") ||
-           t.contains("termómetro") || t.contains("termometro") ||
-           t.contains("fluorescente") ||
-           t.contains("bolígrafo/lápiz") || t.contains("boligrafo/lapiz") ||
-           t.contains("envase sddr") || t.contains("vale sddr")
+           t.contains("vidrio") || t.contains("orgánico") || t.contains("organico")
 }
 
 /** Calcula puntos y mensaje motivacional. */
@@ -1378,63 +1238,10 @@ private fun calcularPuntos(label: String): Pair<Int, String> {
         return Pair(0, "No reciclable / Desconocido")
     }
     return when {
-        t == "envases" -> Pair(20, "¡Envase depositado en el Contenedor Amarillo!")
-        t == "papel y cartón" || t == "papel y carton" -> Pair(15, "¡Depositado en el Contenedor Azul!")
-        t == "vidrio" -> Pair(25, "¡Depositado en el Contenedor Verde!")
-        t == "orgánico" || t == "organico" -> Pair(10, "¡Depositado en el Contenedor Marrón!")
-
-        t.contains("botella de plástico") -> Pair(20, "¡Botella de plástico reciclada!")
-        t.contains("botella de vidrio") || t.contains("botella de vino") -> Pair(25, "¡Botella de vidrio reciclada!")
-        t.contains("lata de refresco") -> Pair(25, "¡El aluminio es 100% reciclable!")
-        t.contains("lata de conservas") -> Pair(25, "¡Lata de metal reciclada correctamente!")
-        t.contains("brick de leche") -> Pair(20, "¡Brick reciclado correctamente!")
-        t.contains("bote de champú") -> Pair(20, "¡Bote de plástico reciclado!")
-        t.contains("bolsa de snacks") -> Pair(15, "¡Envoltorio de snacks reciclado!")
-        t.contains("papel de aluminio") -> Pair(20, "¡Papel de aluminio reciclado!")
-        t.contains("tarrina de yogur") -> Pair(20, "¡Tarrina de yogur reciclada!")
-        t.contains("bandeja de corcho") -> Pair(20, "¡Bandeja de corcho reciclada!")
-        t.contains("bolsa de plástico") -> Pair(10, "¡Bolsa de plástico reciclada!")
-        t.contains("tapón de plástico") -> Pair(10, "¡Tapón de plástico reciclado!")
-        t.contains("aerosol / spray") -> Pair(20, "¡Aerosol reciclado correctamente!")
-        t.contains("chapa de metal") -> Pair(10, "¡Chapa de metal reciclada!")
-        t.contains("film transparente") -> Pair(10, "¡Film de cocina reciclado!")
-        t.contains("bote detergente") -> Pair(20, "¡Bote de detergente reciclado!")
-        
-        t.contains("periódico / revista") -> Pair(15, "¡Papel reciclado correctamente!")
-        t.contains("caja de cartón") -> Pair(15, "¡Caja de cartón reciclada!")
-        t.contains("huevera de cartón") -> Pair(15, "¡Huevera de cartón reciclada!")
-        t.contains("sobres y cartas") -> Pair(15, "¡Sobres de papel reciclados!")
-        t.contains("caja de pizza") -> Pair(15, "¡Caja de pizza reciclada!")
-        t.contains("libros viejos") -> Pair(20, "¡Libro reciclado correctamente!")
-        t.contains("bolsa de harina") -> Pair(15, "¡Bolsa de papel reciclada!")
-        t.contains("cuaderno") -> Pair(15, "¡Cuaderno reciclado!")
-        
-        t.contains("tarro de mermelada") -> Pair(25, "¡Tarro de vidrio reciclado!")
-        t.contains("frasco de perfume") -> Pair(25, "¡Frasco de vidrio reciclado!")
-        
-        t.contains("restos de comida") -> Pair(10, "¡Residuo orgánico separado correctamente!")
-        t.contains("posos de café") -> Pair(10, "¡Posos de café compostados!")
-        t.contains("tapón de corcho") -> Pair(10, "¡Tapón de corcho reciclado!")
-        t.contains("bolsa de té") -> Pair(10, "¡Bolsa de té compostada!")
-        t.contains("servilleta sucia") -> Pair(10, "¡Servilleta de papel compostada!")
-        t.contains("plátano") || t.contains("platano") -> Pair(10, "¡Piel de plátano compostada!")
-        
-        t.contains("pilas y baterías") -> Pair(30, "¡Pilas/Baterías depositadas en contenedor especial!")
-        t.contains("móvil / tablet") -> Pair(50, "¡Dispositivo electrónico llevado al punto RAEE!")
-        t.contains("aceite usado") -> Pair(30, "¡Aceite llevado a punto de reciclaje!")
-        t.contains("bombilla / led") -> Pair(30, "¡Bombilla llevada a contenedor especial!")
-        t.contains("ropa usada") -> Pair(30, "¡Ropa llevada a contenedor de textiles!")
-        t.contains("medicamentos") -> Pair(30, "¡Medicamentos llevados al punto SIGRE!")
-        t.contains("cápsula de café") -> Pair(15, "¡Cápsula de café reciclada!")
-        t.contains("radiografía") -> Pair(30, "¡Radiografía llevada al punto limpio!")
-        t.contains("bote de pintura") -> Pair(30, "¡Pintura llevada al punto limpio!")
-        t.contains("tostadora / batidora") -> Pair(40, "¡Aparato eléctrico llevado al punto RAEE!")
-        t.contains("cd / dvd") -> Pair(15, "¡CD/DVD llevado al punto limpio!")
-        t.contains("juguete roto") -> Pair(20, "¡Juguete llevado al punto limpio!")
-        t.contains("termómetro") -> Pair(30, "¡Termómetro llevado al punto limpio!")
-        t.contains("fluorescente") -> Pair(30, "¡Fluorescente llevado al punto limpio!")
-        t.contains("bolígrafo/lápiz") -> Pair(10, "¡Bolígrafo/Lápiz llevado al punto limpio!")
-        
+        t.contains("envases") -> Pair(20, "¡Envase depositado en el Contenedor Amarillo!")
+        t.contains("papel y cartón") || t.contains("papel y carton") -> Pair(15, "¡Depositado en el Contenedor Azul!")
+        t.contains("vidrio") -> Pair(25, "¡Depositado en el Contenedor Verde!")
+        t.contains("orgánico") || t.contains("organico") -> Pair(10, "¡Depositado en el Contenedor Marrón!")
         else -> Pair(15, "¡Objeto reciclable detectado!")
     }
 }
@@ -1474,18 +1281,12 @@ private suspend fun analyzeWithGemini(
             }
             
             Reglas de nombre del objeto (el campo "objeto" DEBE coincidir con uno de los siguientes nombres del EcoDex si aplica):
-            - Para envases/plásticos/metales:
-              "Botella de Plástico", "Lata de Conservas", "Lata de Refresco", "Brick de Leche", "Bote de Champú", "Bolsa de Snacks", "Papel de Aluminio", "Tarrina de Yogur", "Bandeja de Corcho", "Bolsa de Plástico", "Tapón de Plástico", "Aerosol / Spray", "Chapa de Metal", "Film Transparente", "Bote Detergente"
-            - Para papel y cartón:
-              "Periódico / Revista", "Caja de Cartón", "Huevera de Cartón", "Sobres y Cartas", "Caja de Pizza", "Libros Viejos", "Bolsa de Harina", "Cuaderno"
-            - Para vidrio:
-              "Botella de Vidrio", "Tarro de Mermelada", "Frasco de Perfume", "Botella de Vino"
-            - Para orgánico:
-              "Restos de Comida", "Posos de Café", "Tapón de Corcho", "Bolsa de Té", "Servilleta Sucia", "Plátano"
-            - Para puntos limpios / especiales / RAEE:
-              "Pilas y Baterías", "Móvil / Tablet", "Aceite Usado", "Bombilla / LED", "Ropa Usada", "Medicamentos", "Cápsula de Café", "Radiografía", "Bote de Pintura", "Tostadora / Batidora", "CD / DVD", "Juguete Roto", "Termómetro", "Fluorescente", "Bolígrafo/Lápiz"
+            - Envases
+            - Papel y Cartón
+            - Vidrio
+            - Orgánico
 
-            Si el objeto es reciclable pero no coincide exactamente, usa el nombre más cercano. Si no es reciclable o es de fondo o no hay nada claro, responde con "Buscando material...", reciclable: false, confianza: 0.1.
+            Si el objeto es reciclable pero no coincide exactamente, clasifícalo en uno de los 4 grupos anteriores. Si no es reciclable o es de fondo o no hay nada claro, responde con "Buscando material...", reciclable: false, confianza: 0.1.
         """.trimIndent()
 
         val partsArray = org.json.JSONArray().apply {
@@ -1606,73 +1407,28 @@ private fun mapearTextoAObjeto(text: String): String? {
     val t = text.lowercase()
     return when {
         // Envases
-        t.contains("cocacola") || t.contains("coca-cola") || t.contains("coca cola") || 
-        t.contains("fanta") || t.contains("pepsi") || contienePalabraCompleta(t, "soda") || 
-        t.contains("cerveza") || contienePalabraCompleta(t, "beer") || t.contains("refresco") -> "Lata de Refresco"
-        
-        contienePalabraCompleta(t, "leche") || contienePalabraCompleta(t, "milk") || contienePalabraCompleta(t, "llet") || t.contains("pascual") || 
-        t.contains("asturiana") || t.contains("hacendado") || contienePalabraCompleta(t, "brick") || contienePalabraCompleta(t, "brik") -> "Brick de Leche"
-        
-        t.contains("shampoo") || t.contains("champú") || t.contains("champu") || contienePalabraCompleta(t, "gel") || 
-        t.contains("pantene") || t.contains("h&s") || t.contains("dada") || t.contains("dove") -> "Bote de Champú"
-        
-        t.contains("detergente") || t.contains("suavizante") || t.contains("limpiador") || 
-        t.contains("detergent") || t.contains("jabón platos") || t.contains("lavavajillas") -> "Bote Detergente"
-        
-        contienePalabraCompleta(t, "agua") || contienePalabraCompleta(t, "water") || t.contains("bezoya") || t.contains("lanjarón") || 
-        t.contains("lanjaron") || t.contains("solán") || t.contains("solan") || t.contains("aquabona") -> "Botella de Plástico"
-        
-        contienePalabraCompleta(t, "vino") || contienePalabraCompleta(t, "wine") || t.contains("glass bottle") || t.contains("vidrio") -> "Botella de Vino"
-        t.contains("mermelada") || contienePalabraCompleta(t, "jam") || t.contains("confitura") || t.contains("tarro") -> "Tarro de Mermelada"
-        t.contains("perfume") || t.contains("colonia") || t.contains("fragancia") -> "Frasco de Perfume"
-        
-        t.contains("conservas") || t.contains("atún") || t.contains("atun") || t.contains("sardinas") || 
-        contienePalabraCompleta(t, "lata") || t.contains("conserva") -> "Lata de Conservas"
-        
-        t.contains("yogur") || t.contains("yoghurt") || t.contains("danone") || t.contains("activia") -> "Tarrina de Yogur"
-        
-        t.contains("patatas") || t.contains("chips") || t.contains("snacks") || t.contains("doritos") || 
-        t.contains("lay's") || t.contains("lays") || contienePalabraCompleta(t, "snack") || t.contains("bolsa patatas") -> "Bolsa de Snacks"
+        t.contains("botella") || t.contains("lata") || t.contains("plástico") || t.contains("plastico") || 
+        t.contains("brick") || t.contains("champú") || t.contains("champu") || t.contains("detergente") || 
+        t.contains("envase") || t.contains("bolsa") || t.contains("yogur") -> "Envases"
         
         // Papel y cartón
-        t.contains("pizza") || t.contains("telepizza") || t.contains("domino's") || t.contains("dominos") -> "Caja de Pizza"
-        t.contains("harina") || t.contains("flour") -> "Bolsa de Harina"
-        t.contains("cuaderno") || t.contains("libreta") || t.contains("notebook") -> "Cuaderno"
-        t.contains("periódico") || t.contains("periodico") || t.contains("revista") || t.contains("news") || t.contains("diario") -> "Periódico / Revista"
-        t.contains("carta") || t.contains("sobre") || t.contains("correo") || t.contains("mail") -> "Sobres y Cartas"
-        t.contains("libro") || t.contains("novela") || t.contains("book") -> "Libros Viejos"
+        t.contains("papel") || t.contains("cartón") || t.contains("carton") || t.contains("caja") || 
+        t.contains("periódico") || t.contains("periodico") || t.contains("revista") || t.contains("libro") || 
+        t.contains("cuaderno") || t.contains("sobre") || t.contains("carta") -> "Papel y Cartón"
         
-        // Café/Té/Orgánico
-        t.contains("café") || t.contains("cafe") || t.contains("coffee") || t.contains("nespresso") || t.contains("dolce") -> "Posos de Café"
-        contienePalabraCompleta(t, "té") || contienePalabraCompleta(t, "te") || contienePalabraCompleta(t, "tea") || t.contains("infusión") || t.contains("infusion") -> "Bolsa de Té"
-        t.contains("plátano") || t.contains("platano") || t.contains("banana") -> "Plátano"
+        // Vidrio
+        t.contains("vidrio") || t.contains("cristal") || t.contains("tarro") || t.contains("frasco") -> "Vidrio"
         
-        // Especiales
-        contienePalabraCompleta(t, "pila") || contienePalabraCompleta(t, "pilas") || t.contains("batería") || t.contains("bateria") || contienePalabraCompleta(t, "battery") -> "Pilas y Baterías"
-        t.contains("medicamento") || t.contains("medicamentos") || t.contains("pastillas") || t.contains("jarabe") || t.contains("aspirina") || t.contains("sigre") -> "Medicamentos"
-        t.contains("bombilla") || contienePalabraCompleta(t, "led") || t.contains("foco") -> "Bombilla / LED"
-        contienePalabraCompleta(t, "boli") || t.contains("bolígrafo") || t.contains("boligrafo") || t.contains("lápiz") || t.contains("lapiz") || t.contains("pluma") || t.contains("bic") -> "Bolígrafo/Lápiz"
+        // Orgánico
+        t.contains("orgánico") || t.contains("organico") || t.contains("comida") || t.contains("fruta") || 
+        t.contains("plátano") || t.contains("platano") || t.contains("café") || t.contains("cafe") || 
+        t.contains("té") || t.contains("te ") || t.contains("restos") -> "Orgánico"
         
         else -> null
     }
 }
 
 private fun esObjetoEspecial(label: String): Boolean {
-    val t = label.lowercase()
-    return t.contains("pilas y baterías") ||
-           t.contains("móvil / tablet") ||
-           t.contains("aceite usado") ||
-           t.contains("bombilla / led") ||
-           t.contains("ropa usada") ||
-           t.contains("medicamentos") ||
-           t.contains("cápsula de café") ||
-           t.contains("radiografía") ||
-           t.contains("bote de pintura") ||
-           t.contains("tostadora / batidora") ||
-           t.contains("cd / dvd") ||
-           t.contains("juguete roto") ||
-           t.contains("termómetro") ||
-           t.contains("fluorescente") ||
-           t.contains("bolígrafo/lápiz")
+    return false
 }
 

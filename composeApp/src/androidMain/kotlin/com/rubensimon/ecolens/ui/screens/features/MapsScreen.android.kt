@@ -33,6 +33,7 @@ actual fun PlatformMapView(
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
     var userLocation by remember { mutableStateOf<Location?>(null) }
     var mapInstance by remember { mutableStateOf<com.google.android.gms.maps.GoogleMap?>(null) }
+    var hasInitiallycentered by remember { mutableStateOf(false) }
 
     val recyclingPoints = remember(allPoints, filter, userLocation) {
         when (filter) {
@@ -43,15 +44,7 @@ actual fun PlatformMapView(
             "PROXIMIDAD" -> {
                 val loc = userLocation
                 if (loc != null) {
-                    allPoints.filter { point ->
-                        val distance = FloatArray(1)
-                        Location.distanceBetween(
-                            loc.latitude, loc.longitude,
-                            point.position.latitude, point.position.longitude,
-                            distance
-                        )
-                        distance[0] < 3000 // Radio de 3km
-                    }.sortedBy { point ->
+                    allPoints.sortedBy { point ->
                         val distance = FloatArray(1)
                         Location.distanceBetween(
                             loc.latitude, loc.longitude,
@@ -59,9 +52,9 @@ actual fun PlatformMapView(
                             distance
                         )
                         distance[0]
-                    }
+                    }.take(10) // Mostrar los 10 más cercanos
                 } else {
-                    allPoints // Fallback: mostrar todos si no hay GPS aún
+                    allPoints.take(10) // Fallback: mostrar 10 si no hay GPS aún
                 }
             }
             else -> allPoints.filter { it.kind == filter }
@@ -113,24 +106,23 @@ actual fun PlatformMapView(
         }
     }
 
-    // Función auxiliar para centrar el mapa en la ubicación GPS actual
     fun centerOnGps(googleMap: com.google.android.gms.maps.GoogleMap) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
         try {
             googleMap.isMyLocationEnabled = true
-            // Primero intentamos con la última ubicación conocida (rápido)
+            // Intentar con lastLocation
             fusedLocationClient.lastLocation.addOnSuccessListener { location ->
                 if (location != null) {
                     userLocation = location
-                    googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(location.latitude, location.longitude), 17f))
+                    googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(location.latitude, location.longitude), 16f))
                 }
             }
-            // Luego pedimos una ubicación fresca de alta precisión (GPS real)
+            // Asegurar ubicación actual
             fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
                 .addOnSuccessListener { location ->
                     if (location != null) {
                         userLocation = location
-                        googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(location.latitude, location.longitude), 17f))
+                        googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(location.latitude, location.longitude), 16f))
                     }
                 }
         } catch (e: SecurityException) {
@@ -145,10 +137,11 @@ actual fun PlatformMapView(
         }
     }
 
-    // Recentrar cuando se concede el permiso de ubicación
-    LaunchedEffect(hasLocationPermission) {
-        if (hasLocationPermission) {
-            mapInstance?.let { centerOnGps(it) }
+    // Centrar en GPS cuando el mapa y el permiso están listos (primera vez)
+    LaunchedEffect(mapInstance, hasLocationPermission) {
+        if (mapInstance != null && hasLocationPermission && !hasInitiallycentered) {
+            hasInitiallycentered = true
+            centerOnGps(mapInstance!!)
         }
     }
 
